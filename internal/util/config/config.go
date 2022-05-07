@@ -33,6 +33,12 @@ type Config struct {
 		Timeout    time.Duration `yaml:"timeout"`
 		MaxRefresh time.Duration `yaml:"maxRefresh"`
 	}
+
+	Redis struct {
+		Endpoint string `yaml:"endpoint"`
+		DB       int    `yaml:"db"`
+		Passwd   string `yaml:"passwd"`
+	}
 }
 
 func GetConfig() Config {
