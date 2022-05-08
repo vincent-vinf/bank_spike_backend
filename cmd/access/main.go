@@ -5,6 +5,7 @@ import (
 	"bank_spike_backend/internal/access"
 	"bank_spike_backend/internal/db"
 	redisx "bank_spike_backend/internal/redis"
+	"bank_spike_backend/internal/util"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,16 +35,21 @@ func init() {
 func main() {
 	defer db.Close()
 	defer redisx.Close()
+
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", rpcPort))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer()
 	access.RegisterAccessServer(grpcServer, &accessServer{})
-	err = grpcServer.Serve(lis)
-	if err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	go func() {
+		err = grpcServer.Serve(lis)
+		if err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+
+	util.WatchSignal()
 }
 
 type accessServer struct{}
@@ -70,6 +76,7 @@ func (s *accessServer) IsAccessible(ctx context.Context, req *access.AccessReq) 
 	if err != nil {
 		return nil, err
 	}
+	// TODO 增加一个redis缓存层？？？
 	return &access.AccessRes{Result: res, Reason: reason}, nil
 }
 

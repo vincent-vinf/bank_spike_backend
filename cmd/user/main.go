@@ -2,9 +2,9 @@ package main
 
 import (
 	"bank_spike_backend/internal/db"
+	"bank_spike_backend/internal/util"
 	jwtx "bank_spike_backend/internal/util/jwt"
 	"flag"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
 )
@@ -20,6 +20,7 @@ func init() {
 
 func main() {
 	defer db.Close()
+
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
@@ -42,7 +43,8 @@ func main() {
 	auth.Use(authMiddleware.MiddlewareFunc())
 	// Refresh time can be longer than token timeout
 	auth.GET("/refresh_token", authMiddleware.RefreshHandler)
-	log.Fatal(r.Run(fmt.Sprintf(":%d", port)))
+
+	util.WatchSignalGrace(r, port)
 }
 
 func registerHandler(c *gin.Context) {

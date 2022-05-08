@@ -2,9 +2,9 @@ package main
 
 import (
 	"bank_spike_backend/internal/access"
+	"bank_spike_backend/internal/util"
 	jwtx "bank_spike_backend/internal/util/jwt"
 	"flag"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -50,7 +50,7 @@ func main() {
 	router.Use(authMiddleware.MiddlewareFunc())
 	router.POST("/:id", dealHandler)
 
-	log.Fatal(r.Run(fmt.Sprintf(":%d", port)))
+	util.WatchSignalGrace(r, port)
 }
 
 func dealHandler(c *gin.Context) {
