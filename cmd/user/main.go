@@ -30,7 +30,7 @@ func main() {
 	})
 
 	// 初始化JWT中间件
-	authMiddleware, err := jwtx.GetAuthMiddleware()
+	authMiddleware, err := jwtx.GetAuthMiddleware(false)
 	if err != nil {
 		log.Fatal(err)
 	}

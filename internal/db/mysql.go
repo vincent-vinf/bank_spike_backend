@@ -59,9 +59,13 @@ func Register(username, phone, passwd string) (int, error) {
 	return int(id), nil
 }
 
-func Login(phone, passwd string) (int, error) {
+func Login(phone, passwd string, isAdmin bool) (int, error) {
 	db := getInstance()
-	stmt, err := db.Prepare("select id from users where phone = ? and passwd = ?")
+	query := "select id from users where phone = ? and passwd = ?"
+	if isAdmin {
+		query = "select id from admin where phone = ? and passwd = ?"
+	}
+	stmt, err := db.Prepare(query)
 	if err != nil {
 		return 0, err
 	}

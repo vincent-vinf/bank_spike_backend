@@ -37,15 +37,23 @@ type TokenUserInfo struct {
 	ID string
 }
 
-func GetAuthMiddleware() (*jwt.GinJWTMiddleware, error) {
-	cfg := config.GetConfig().JWT
+func GetAuthMiddleware(isAdmin bool) (*jwt.GinJWTMiddleware, error) {
+	cfg := config.GetConfig()
+	if isAdmin {
+		return getAuthMiddleware([]byte(cfg.AdminJWT.Secret), cfg.AdminJWT.Timeout, cfg.AdminJWT.MaxRefresh, isAdmin)
+	} else {
+		return getAuthMiddleware([]byte(cfg.JWT.Secret), cfg.JWT.Timeout, cfg.JWT.MaxRefresh, isAdmin)
+	}
+}
+
+func getAuthMiddleware(secret []byte, timeout, maxRefresh time.Duration, isAdmin bool) (*jwt.GinJWTMiddleware, error) {
 	var err error
-	// the jwt middleware
+
 	authMiddleware, err = jwt.New(&jwt.GinJWTMiddleware{
 		Realm:       appRealm,
-		Key:         []byte(cfg.Secret),
-		Timeout:     cfg.Timeout,
-		MaxRefresh:  cfg.MaxRefresh,
+		Key:         secret,
+		Timeout:     timeout,
+		MaxRefresh:  maxRefresh,
 		IdentityKey: IdentityKey,
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
 			if v, ok := data.(*TokenUserInfo); ok {
@@ -72,7 +80,7 @@ func GetAuthMiddleware() (*jwt.GinJWTMiddleware, error) {
 			if phone == "" || passwd == "" {
 				return nil, jwt.ErrFailedAuthentication
 			}
-			id, err := db.Login(phone, passwd)
+			id, err := db.Login(phone, passwd, isAdmin)
 			if err != nil {
 				log.Println(err)
 				return nil, jwt.ErrFailedAuthentication

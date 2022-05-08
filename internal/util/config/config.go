@@ -34,6 +34,12 @@ type Config struct {
 		MaxRefresh time.Duration `yaml:"maxRefresh"`
 	}
 
+	AdminJWT struct {
+		Secret     string        `yaml:"secret"`
+		Timeout    time.Duration `yaml:"timeout"`
+		MaxRefresh time.Duration `yaml:"maxRefresh"`
+	}
+
 	Redis struct {
 		Endpoint string `yaml:"endpoint"`
 		DB       int    `yaml:"db"`
