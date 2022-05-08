@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
-	"strconv"
 )
 
 var (
@@ -55,21 +54,11 @@ func main() {
 }
 
 func dealHandler(c *gin.Context) {
-	spikeId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(400, gin.H{
-			"error": "bad request",
-		})
-		return
-	}
-
-	log.Println(spikeId)
 	t, _ := c.Get(jwtx.IdentityKey)
 	user := t.(*jwtx.TokenUserInfo)
-	userId, _ := strconv.Atoi(user.ID)
 	accessible, err := client.IsAccessible(c, &access.AccessReq{
-		UserId:  int32(userId),
-		SpikeId: int32(spikeId),
+		UserId:  user.ID,
+		SpikeId: c.Param("id"),
 	})
 	if err != nil {
 		c.JSON(500, gin.H{

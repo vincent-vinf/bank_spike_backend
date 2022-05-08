@@ -1,11 +1,13 @@
 package db
 
 import (
+	"bank_spike_backend/internal/orm"
 	"bank_spike_backend/internal/util/config"
 	"database/sql"
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -96,4 +98,50 @@ func IsExistPhone(phone string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func GetUserById(id string) (*orm.User, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select username,phone,id_number,work_status,age from users where id = ?")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(id)
+	if err != nil {
+		return nil, err
+	}
+	u := &orm.User{}
+	u.ID = id
+	if rows.Next() {
+		err := rows.Scan(&u.Username, &u.Phone, &u.IDNumber, &u.WorkStatus, &u.Age)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return u, nil
+}
+
+func GetSpikeById(id string) (*orm.Spike, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where id = ?")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(id)
+	if err != nil {
+		return nil, err
+	}
+	s := &orm.Spike{}
+	s.ID = id
+	if rows.Next() {
+		var cId int
+		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
+		if err != nil {
+			return nil, err
+		}
+		s.CommodityID = strconv.Itoa(cId)
+	}
+	return s, nil
 }

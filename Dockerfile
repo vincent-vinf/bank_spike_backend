@@ -13,7 +13,8 @@ COPY internal internal
 RUN mkdir -p "bin" && \
     go build -o bin/access-server cmd/access/main.go && \
     go build -o bin/spike-server cmd/spike/main.go && \
-    go build -o bin/user-server cmd/user/main.go
+    go build -o bin/user-server cmd/user/main.go && \
+    go build -o bin/admin-server cmd/admin/main.go
 
 # access
 FROM gcr.io/distroless/static as access
@@ -31,4 +32,10 @@ USER root
 FROM gcr.io/distroless/static as user
 WORKDIR /
 COPY --from=builder /app/bin/user-server /
+USER root
+
+# admin
+FROM gcr.io/distroless/static as admin
+WORKDIR /
+COPY --from=builder /app/bin/admin-server /
 USER root

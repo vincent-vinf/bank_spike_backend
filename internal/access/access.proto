@@ -9,10 +9,11 @@ service Access{
 }
 
 message AccessReq {
-  int32 UserId = 1;
-  int32 SpikeId = 2;
+  string UserId = 1;
+  string SpikeId = 2;
 }
 
 message AccessRes {
   bool result = 1;
+  string reason = 2;
 }
