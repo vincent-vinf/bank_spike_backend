@@ -76,7 +76,7 @@ func (s *accessServer) IsAccessible(ctx context.Context, req *access.AccessReq) 
 	if err != nil {
 		return nil, err
 	}
-	// TODO 增加一个redis缓存层？？？
+	/// TODO(vincent) 增加一个redis缓存层？？？
 	return &access.AccessRes{Result: res, Reason: reason}, nil
 }
 

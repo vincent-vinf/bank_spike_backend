@@ -42,3 +42,9 @@ func Get(ctx context.Context, key string) (string, error) {
 	rdb := getInstance()
 	return rdb.Get(ctx, key).Result()
 }
+
+//func SetNX(key,value string)  {
+//	rdb := getInstance()
+//	resp := rdb.SetNX(key, value, time.Second*5)
+//	lockSuccess, err := resp.Result()
+//}

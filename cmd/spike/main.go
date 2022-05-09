@@ -5,7 +5,9 @@ import (
 	"bank_spike_backend/internal/db"
 	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
+	"bank_spike_backend/internal/util/config"
 	jwtx "bank_spike_backend/internal/util/jwt"
+	"crypto/sha256"
 	"flag"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -77,4 +79,12 @@ func spikeHandlerFactory(spikeId string) func(c *gin.Context) {
 			"msg": accessible,
 		})
 	}
+}
+
+func newSpike() {
+
+}
+func getRandUrl(spikeId string) string {
+	b := sha256.Sum256([]byte(config.GetConfig().Spike.RandUrlKey + spikeId))
+	return string(b[:])
 }

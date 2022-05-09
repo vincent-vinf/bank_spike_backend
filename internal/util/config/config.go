@@ -2,8 +2,8 @@ package config
 
 import (
 	"flag"
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 	"log"
 	"sync"
 	"time"
@@ -19,47 +19,71 @@ func init() {
 	flag.StringVar(&configPath, "config-path", "E:\\vincent\\repos\\bank_spike_backend\\configs\\config.yaml", "")
 }
 
+func InitViper() {
+	once.Do(func() {
+		viper.SetConfigFile(configPath)
+		err := viper.ReadInConfig()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		viper.WatchConfig()
+		viper.OnConfigChange(func(in fsnotify.Event) {
+			if err := viper.Unmarshal(config); err != nil {
+				log.Fatalf("unmarshal conf failed, err:%s \n", err)
+			}
+			log.Println("config reloaded")
+		})
+	})
+}
+
 type Config struct {
 	Mysql struct {
-		Host     string `yaml:"host"`
-		Port     string `yaml:"port"`
-		User     string `yaml:"user"`
-		Passwd   string `yaml:"passwd"`
-		Database string `yaml:"database"`
+		Host     string
+		Port     string
+		User     string
+		Passwd   string
+		Database string
 	}
 
 	JWT struct {
-		Secret     string        `yaml:"secret"`
-		Timeout    time.Duration `yaml:"timeout"`
-		MaxRefresh time.Duration `yaml:"maxRefresh"`
+		Secret     string
+		Timeout    time.Duration
+		MaxRefresh time.Duration
 	}
 
 	AdminJWT struct {
-		Secret     string        `yaml:"secret"`
-		Timeout    time.Duration `yaml:"timeout"`
-		MaxRefresh time.Duration `yaml:"maxRefresh"`
-	}
+		Secret     string
+		Timeout    time.Duration
+		MaxRefresh time.Duration
+	} `mapstructure:"admin_jwt"`
 
 	Redis struct {
-		Endpoint string `yaml:"endpoint"`
-		DB       int    `yaml:"db"`
-		Passwd   string `yaml:"passwd"`
+		Endpoint string
+		DB       int
+		Passwd   string
+	}
+
+	RabbitMQ struct {
+		Host   string
+		Port   string
+		User   string
+		Passwd string
+	} `mapstructure:"rabbitmq"`
+
+	Spike struct {
+		RandUrlKey string `mapstructure:"rand_url_key"`
 	}
 }
 
 func GetConfig() Config {
-	if config == nil {
-		once.Do(func() {
-			config = &Config{}
-			data, err := ioutil.ReadFile(configPath)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			err = yaml.Unmarshal(data, config)
-			if err != nil {
-				log.Fatalln(err)
-			}
-		})
+	if config != nil {
+		return *config
 	}
-	return *config
+	var c Config
+	err := viper.Unmarshal(&c)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	config = &c
+	return c
 }

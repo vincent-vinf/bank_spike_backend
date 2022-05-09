@@ -3,12 +3,12 @@ package config
 import (
 	"log"
 	"testing"
+	"time"
 )
 
 func TestConfig(t *testing.T) {
-	cfg, err := GetConfig()
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	log.Println(cfg.JWT.Secret)
+	InitViper()
+	c := GetConfig()
+	log.Println(c)
+	time.Sleep(time.Second * 10)
 }
