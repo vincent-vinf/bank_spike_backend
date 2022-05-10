@@ -8,12 +8,16 @@ import (
 	"time"
 )
 
+const (
+	RandKey = "rand:"
+)
+
 var (
 	rdb  *redis.Client
 	once sync.Once
 )
 
-func getInstance() *redis.Client {
+func getInstance() {
 	if rdb == nil {
 		once.Do(func() {
 			cfg := config.GetConfig().Redis
@@ -24,7 +28,6 @@ func getInstance() *redis.Client {
 			})
 		})
 	}
-	return rdb
 }
 
 func Close() {
@@ -34,17 +37,28 @@ func Close() {
 }
 
 func Set(ctx context.Context, key, value string, timeout time.Duration) {
-	rdb := getInstance()
+	getInstance()
 	rdb.Set(ctx, key, value, timeout)
 }
 
+func SetNX(ctx context.Context, key, value string, timeout time.Duration) (bool, error) {
+	resp := rdb.SetNX(ctx, key, value, timeout)
+	return resp.Result()
+}
+
 func Get(ctx context.Context, key string) (string, error) {
-	rdb := getInstance()
+	getInstance()
 	return rdb.Get(ctx, key).Result()
 }
 
-//func SetNX(key,value string)  {
-//	rdb := getInstance()
-//	resp := rdb.SetNX(key, value, time.Second*5)
-//	lockSuccess, err := resp.Result()
-//}
+// CheckUrl 根据活动id查询redis中的随机数, 与用户传入参数对比
+func CheckUrl(ctx context.Context, spikeId, rand string) (bool, error) {
+	r, err := Get(ctx, RandKey+spikeId)
+	if err != nil {
+		return false, err
+	}
+	if r == rand {
+		return true, nil
+	}
+	return false, nil
+}

@@ -115,6 +115,7 @@ func GetUserById(id string) (*orm.User, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	u := &orm.User{}
 	u.ID = id
 	if rows.Next() {
@@ -137,6 +138,7 @@ func GetSpikeById(id string) (*orm.Spike, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	s := &orm.Spike{}
 	s.ID = id
 	if rows.Next() {
@@ -148,4 +150,62 @@ func GetSpikeById(id string) (*orm.Spike, error) {
 		s.CommodityID = strconv.Itoa(cId)
 	}
 	return s, nil
+}
+
+func GetActiveSpike() ([]*orm.Spike, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where start_time <= ? and end_time >= ?")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	now := time.Now()
+	rows, err := stmt.Query(now, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var res []*orm.Spike
+	for rows.Next() {
+		var cId int
+		s := &orm.Spike{}
+
+		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
+		if err != nil {
+			return nil, err
+		}
+		s.CommodityID = strconv.Itoa(cId)
+
+		res = append(res, s)
+	}
+	return res, nil
+}
+
+func GetSleepSpike() ([]*orm.Spike, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where start_time > ?")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	now := time.Now()
+	rows, err := stmt.Query(now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var res []*orm.Spike
+	for rows.Next() {
+		var cId int
+		s := &orm.Spike{}
+
+		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
+		if err != nil {
+			return nil, err
+		}
+		s.CommodityID = strconv.Itoa(cId)
+
+		res = append(res, s)
+	}
+	return res, nil
 }

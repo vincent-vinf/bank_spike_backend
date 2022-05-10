@@ -3,6 +3,7 @@ package main
 import (
 	"bank_spike_backend/internal/db"
 	"bank_spike_backend/internal/util"
+	"bank_spike_backend/internal/util/config"
 	jwtx "bank_spike_backend/internal/util/jwt"
 	"flag"
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,7 @@ var (
 func init() {
 	flag.IntVar(&port, "port", 8080, "")
 	flag.Parse()
+	config.InitViper()
 }
 
 func main() {

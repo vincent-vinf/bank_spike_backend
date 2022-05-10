@@ -6,6 +6,7 @@ import (
 	"bank_spike_backend/internal/db"
 	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
+	"bank_spike_backend/internal/util/config"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,6 +31,7 @@ var (
 func init() {
 	flag.IntVar(&rpcPort, "rpc-port", 8082, "")
 	flag.Parse()
+	config.InitViper()
 }
 
 func main() {
@@ -49,6 +51,7 @@ func main() {
 		}
 	}()
 
+	log.Println("init access service")
 	util.WatchSignal()
 }
 

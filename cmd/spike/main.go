@@ -7,7 +7,6 @@ import (
 	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
 	jwtx "bank_spike_backend/internal/util/jwt"
-	"crypto/sha256"
 	"flag"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -25,6 +24,7 @@ func init() {
 	flag.StringVar(&accessEndpoint, "access-endpoint", "127.0.0.1:8082", "")
 	flag.IntVar(&port, "port", 8081, "")
 	flag.Parse()
+	config.InitViper()
 }
 
 func main() {
@@ -54,37 +54,42 @@ func main() {
 
 	router := r.Group("/spike")
 	router.Use(authMiddleware.MiddlewareFunc())
-	router.POST("/", spikeHandlerFactory("1"))
+	router.POST("/:id/:rand", spikeHandler)
 
 	util.WatchSignalGrace(r, port)
 }
 
-// spikeHandlerFactory 为传入的活动制造handler
-func spikeHandlerFactory(spikeId string) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		t, _ := c.Get(jwtx.IdentityKey)
-		user := t.(*jwtx.TokenUserInfo)
-		accessible, err := client.IsAccessible(c, &access.AccessReq{
-			UserId:  user.ID,
-			SpikeId: spikeId,
-		})
-		if err != nil {
-			c.JSON(500, gin.H{
-				"error": "access server err",
-			})
-			log.Println(err)
-			return
-		}
-		c.JSON(200, gin.H{
-			"msg": accessible,
-		})
+func spikeHandler(c *gin.Context) {
+	spikeId := c.Param("id")
+	rand := c.Param("rand")
+	pass, err := redisx.CheckUrl(c, spikeId, rand)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "access server err"})
+		log.Println(err)
+		return
 	}
-}
+	if !pass {
+		c.JSON(404, gin.H{"message": "Page not found"})
+		return
+	}
 
-func newSpike() {
+	t, _ := c.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
+	accessible, err := client.IsAccessible(c, &access.AccessReq{
+		UserId:  user.ID,
+		SpikeId: spikeId,
+	})
+	if err != nil {
+		c.JSON(500, gin.H{
+			"error": "access server err",
+		})
+		log.Println(err)
+		return
+	}
 
-}
-func getRandUrl(spikeId string) string {
-	b := sha256.Sum256([]byte(config.GetConfig().Spike.RandUrlKey + spikeId))
-	return string(b[:])
+	/// TODO(vincent)秒杀逻辑
+
+	c.JSON(200, gin.H{
+		"msg": accessible,
+	})
 }

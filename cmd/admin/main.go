@@ -4,10 +4,17 @@ import (
 	"bank_spike_backend/internal/db"
 	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
+	"bank_spike_backend/internal/util/config"
 	jwtx "bank_spike_backend/internal/util/jwt"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"log"
+	"math/rand"
+	"time"
 )
 
 var (
@@ -17,13 +24,17 @@ var (
 func init() {
 	flag.IntVar(&port, "port", 8080, "")
 	flag.Parse()
+	config.InitViper()
 }
 
 func main() {
 	defer db.Close()
 	defer redisx.Close()
 
-	buildSpikeWork()
+	err := buildSpikeWork()
+	if err != nil {
+		log.Fatal("buildSpikeWork fail: " + err.Error())
+	}
 
 	r := gin.New()
 	r.Use(gin.Logger())
@@ -56,11 +67,31 @@ func main() {
 
 // buildSpikeWork 启动时检查所有正在进行的活动，若未设置randUrl则生成并设置
 // 对于即将开始的秒杀活动插入时间队列
-func buildSpikeWork() {
+func buildSpikeWork() error {
+	spikes, err := db.GetActiveSpike()
+	if err != nil {
+		return err
+	}
+
+	for _, spike := range spikes {
+		_, err := redisx.Get(context.Background(), redisx.RandKey+spike.ID)
+		if err == nil {
+			continue
+		}
+		if err != redis.Nil {
+			return err
+		}
+		_, err = redisx.SetNX(context.Background(), redisx.RandKey+spike.ID, getRandUrl(spike.ID), spike.EndTime.Sub(time.Now()))
+		if err != nil {
+			return err
+		}
+	}
+
 	//time.Sleep(time.Until(until))
+	return nil
 }
 
-/// TODO(vincent) 实现接口，通过mq同步到spike服务
+/// TODO(vincent) 实现接口，管理秒杀活动，对应每次的管理操作要同步到mq，触发其他admin同步更新
 
 func addSpike(context *gin.Context) {
 
@@ -72,4 +103,11 @@ func deleteSpike(context *gin.Context) {
 
 func updateSpike(context *gin.Context) {
 
+}
+
+func getRandUrl(spikeId string) string {
+	token := make([]byte, 32)
+	rand.Read(token)
+	b := sha256.Sum256(append(token, []byte(config.GetConfig().Spike.RandUrlKey+spikeId)...))
+	return hex.EncodeToString(b[:])
 }
