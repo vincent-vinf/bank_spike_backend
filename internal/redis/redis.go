@@ -87,7 +87,9 @@ func DecStore(ctx context.Context, key string, num int) (int, error) {
 func CheckUrl(ctx context.Context, spikeId, rand string) (bool, error) {
 	getInstance()
 	r, err := Get(ctx, RandKey+spikeId)
-	if err != nil {
+	if err == redis.Nil {
+		return false, nil
+	} else if err != nil {
 		return false, err
 	}
 	if r == rand {

@@ -154,60 +154,79 @@ func GetSpikeById(id string) (*orm.Spike, error) {
 	return nil, nil
 }
 
-func GetActiveSpike() ([]*orm.Spike, error) {
+//func GetActiveSpike() ([]*orm.Spike, error) {
+//	db := getInstance()
+//	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where start_time <= ? and end_time >= ?")
+//	if err != nil {
+//		return nil, err
+//	}
+//	defer stmt.Close()
+//	now := time.Now()
+//	rows, err := stmt.Query(now, now)
+//	if err != nil {
+//		return nil, err
+//	}
+//	defer rows.Close()
+//	var res []*orm.Spike
+//	for rows.Next() {
+//		var cId int
+//		s := &orm.Spike{}
+//
+//		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
+//		if err != nil {
+//			return nil, err
+//		}
+//		s.CommodityID = strconv.Itoa(cId)
+//
+//		res = append(res, s)
+//	}
+//	return res, nil
+//}
+
+func GetOrderList(uid string) ([]*orm.Order, error) {
 	db := getInstance()
-	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where start_time <= ? and end_time >= ?")
+	stmt, err := db.Prepare("select id,spike_id,quantity,state,create_time from orders where user_id = ?")
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
-	now := time.Now()
-	rows, err := stmt.Query(now, now)
+	rows, err := stmt.Query(uid)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var res []*orm.Spike
+	var res []*orm.Order
 	for rows.Next() {
-		var cId int
-		s := &orm.Spike{}
+		var oId, sId int
+		s := &orm.Order{UserID: uid}
 
-		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
+		err := rows.Scan(&oId, &sId, &s.Quantity, &s.State, &s.CreateTime)
 		if err != nil {
 			return nil, err
 		}
-		s.CommodityID = strconv.Itoa(cId)
+		s.ID = strconv.Itoa(oId)
+		s.SpikeID = strconv.Itoa(sId)
 
 		res = append(res, s)
 	}
 	return res, nil
 }
 
-func GetSleepSpike() ([]*orm.Spike, error) {
+func InsertOrder(order *orm.Order) error {
 	db := getInstance()
-	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where start_time > ?")
+	stmt, err := db.Prepare("insert into orders(user_id,spike_id,quantity,state,create_time) values (?,?,?,?,?)")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer stmt.Close()
-	now := time.Now()
-	rows, err := stmt.Query(now)
+	res, err := stmt.Exec(order.UserID, order.SpikeID, order.Quantity, order.State, order.CreateTime)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
-	var res []*orm.Spike
-	for rows.Next() {
-		var cId int
-		s := &orm.Spike{}
-
-		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
-		if err != nil {
-			return nil, err
-		}
-		s.CommodityID = strconv.Itoa(cId)
-
-		res = append(res, s)
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
 	}
-	return res, nil
+	order.ID = strconv.Itoa(int(id))
+	return nil
 }

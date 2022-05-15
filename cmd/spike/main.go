@@ -2,8 +2,10 @@ package main
 
 import (
 	"bank_spike_backend/internal/db"
+	"bank_spike_backend/internal/mq"
 	"bank_spike_backend/internal/orm"
 	"bank_spike_backend/internal/pb/access"
+	"bank_spike_backend/internal/pb/order"
 	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
@@ -25,9 +27,11 @@ import (
 
 var (
 	accessEndpoint string
-	client         access.AccessClient
 	port           int
-	loader         = &singleflight.Group{}
+
+	client access.AccessClient
+	loader = &singleflight.Group{}
+	sender *mq.Client
 )
 
 func init() {
@@ -66,6 +70,9 @@ func main() {
 	router.Use(authMiddleware.MiddlewareFunc())
 	router.GET("/:id", getRandHandler)
 	router.POST("/:id/:rand", spikeHandler)
+
+	sender = mq.NewClient()
+	defer sender.Close()
 
 	util.WatchSignalGrace(r, port)
 }
@@ -156,7 +163,7 @@ func spikeHandler(c *gin.Context) {
 	/// TODO(vincent)订单已存在情况判断
 
 	if getRestStock(c, spikeId) <= 0 {
-		c.JSON(200, gin.H{"result": "fail", "msg": "sold out"})
+		c.JSON(200, gin.H{"status": "fail", "msg": "sold out"})
 		return
 	}
 
@@ -166,12 +173,17 @@ func spikeHandler(c *gin.Context) {
 		return
 	}
 	if restStore == -1 {
-		c.JSON(200, gin.H{"result": "fail", "msg": "sold out"})
+		c.JSON(200, gin.H{"status": "fail", "msg": "sold out"})
 		return
 	}
 
-	// 订单详情发送到消息队列
+	sender.Publish(&order.OrderInfo{
+		UserId:   user.ID,
+		SpikeId:  spikeId,
+		Quantity: 1,
+	})
 
+	c.JSON(200, gin.H{"status": "success", "msg": "rest: " + strconv.Itoa(restStore)})
 }
 
 func getRestStock(ctx context.Context, spikeId string) (res int) {
@@ -184,11 +196,13 @@ func getRestStock(ctx context.Context, spikeId string) (res int) {
 			}
 			return spike, nil
 		})
+
 		if err != nil {
 			log.Println(err)
 			return
 		}
 		s := spike.(*orm.Spike)
+		log.Println(s)
 		numStr = strconv.Itoa(s.Withholding)
 		ok, err := redisx.SetNX(ctx, redisx.SpikeStoreKey+spikeId, numStr, s.EndTime.Sub(time.Now()))
 		if err != nil {
@@ -214,6 +228,7 @@ func getRestStock(ctx context.Context, spikeId string) (res int) {
 }
 
 func getRandUrl(spikeId string) string {
+	rand.Seed(time.Now().Unix() + 928534782)
 	token := make([]byte, 32)
 	rand.Read(token)
 	b := sha256.Sum256(append(token, []byte(config.GetConfig().Spike.RandUrlKey+spikeId)...))
@@ -221,6 +236,6 @@ func getRandUrl(spikeId string) string {
 }
 
 func internalErr(c *gin.Context, err error) {
-	c.JSON(500, gin.H{"error": "access server err"})
+	c.JSON(500, gin.H{"error": "spike server err"})
 	log.Println(err)
 }

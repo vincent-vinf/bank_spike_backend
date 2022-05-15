@@ -54,26 +54,6 @@ func main() {
 	util.WatchSignalGrace(r, port)
 }
 
-// buildSpikeWork 启动时检查所有正在进行的活动，若未设置randUrl则生成并设置
-// 对于即将开始的秒杀活动插入时间队列
-//func buildSpikeWork() error {
-//	spikes, err := db.GetActiveSpike()
-//	if err != nil {
-//		return err
-//	}
-//
-//	for _, spike := range spikes {
-//		// 用锁的方式保证随机url只被生成&插入redis一次
-//		_, err = redisx.SetNX(context.Background(), redisx.RandKey+spike.ID, getRandUrl(spike.ID), spike.EndTime.Sub(time.Now()))
-//		if err != nil {
-//			return err
-//		}
-//	}
-//
-//	//time.Sleep(time.Until(until))
-//	return nil
-//}
-
 func addSpike(context *gin.Context) {
 
 }

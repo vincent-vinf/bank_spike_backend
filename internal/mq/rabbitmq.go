@@ -13,14 +13,14 @@ const (
 	queueName = "orderRequire"
 )
 
-type client struct {
+type Client struct {
 	conn *amqp.Connection
 	ch   *amqp.Channel
 	q    amqp.Queue
 }
 
-func NewClient() *client {
-	s := &client{}
+func NewClient() *Client {
+	s := &Client{}
 	cfg := config.GetConfig().RabbitMQ
 
 	var err error
@@ -50,7 +50,7 @@ func NewClient() *client {
 	return s
 }
 
-func (c *client) Close() {
+func (c *Client) Close() {
 	if c.ch != nil {
 		c.ch.Close()
 	}
@@ -59,7 +59,7 @@ func (c *client) Close() {
 	}
 }
 
-func (c *client) Publish(info *order.OrderInfo) error {
+func (c *Client) Publish(info *order.OrderInfo) error {
 	data, err := proto.Marshal(info)
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func (c *client) Publish(info *order.OrderInfo) error {
 		})
 }
 
-func (c *client) Consume() <-chan *order.OrderInfo {
+func (c *Client) Consume() <-chan *order.OrderInfo {
 	msgs, err := c.ch.Consume(
 		c.q.Name, // queue
 		"",       // consumer
@@ -92,14 +92,17 @@ func (c *client) Consume() <-chan *order.OrderInfo {
 	ch := make(chan *order.OrderInfo, 1)
 
 	go func() {
-		for {
-			select {
-			case msg := <-msgs:
-				info := &order.OrderInfo{}
-				err = proto.Unmarshal(msg.Body, info)
+		for msg := range msgs {
+			info := &order.OrderInfo{}
+			err = proto.Unmarshal(msg.Body, info)
+			if err != nil {
+				log.Println(err)
+			} else {
 				ch <- info
 			}
 		}
+		// 调用Close之后，msgs被关闭，继而退出for range，关闭ch
+		close(ch)
 	}()
 
 	return ch
