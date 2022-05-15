@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "./internal/pb/order";
+package order;
+
+// protoc --go_out=. .\internal\pb\order\order.proto
+
+message OrderInfo {
+  string UserId = 1;
+  string SpikeId = 2;
+  int32 num = 3;
+}

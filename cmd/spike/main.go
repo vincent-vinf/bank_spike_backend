@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bank_spike_backend/internal/access"
 	"bank_spike_backend/internal/db"
 	"bank_spike_backend/internal/orm"
+	"bank_spike_backend/internal/pb/access"
 	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
@@ -171,6 +171,7 @@ func spikeHandler(c *gin.Context) {
 	}
 
 	// 订单详情发送到消息队列
+
 }
 
 func getRestStock(ctx context.Context, spikeId string) (res int) {

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bank_spike_backend/internal/access"
 	"bank_spike_backend/internal/db"
+	"bank_spike_backend/internal/pb/access"
 	redisx "bank_spike_backend/internal/redis"
 	"context"
 	"log"

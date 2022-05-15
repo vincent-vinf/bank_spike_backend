@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-option go_package = "./internal/access";
+option go_package = "./internal/pb/access";
 package access;
 
-// protoc --go_out=plugins=grpc:. .\internal\access\access.proto
+// protoc --go_out=plugins=grpc:. .\internal\pb\access\access.proto
 service Access{
   rpc IsAccessible(AccessReq) returns (AccessRes) {}
 }

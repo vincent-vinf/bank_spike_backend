@@ -2,8 +2,8 @@ package main
 
 import (
 	"bank_spike_backend/cmd/access/filter"
-	"bank_spike_backend/internal/access"
 	"bank_spike_backend/internal/db"
+	"bank_spike_backend/internal/pb/access"
 	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
