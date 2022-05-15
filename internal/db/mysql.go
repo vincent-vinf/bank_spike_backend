@@ -123,13 +123,14 @@ func GetUserById(id string) (*orm.User, error) {
 		if err != nil {
 			return nil, err
 		}
+		return u, nil
 	}
-	return u, nil
+	return nil, nil
 }
 
 func GetSpikeById(id string) (*orm.Spike, error) {
 	db := getInstance()
-	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where id = ?")
+	stmt, err := db.Prepare("select commodity_id,quantity,withholding,purchase_limit,access_rule,start_time,end_time from spike where id = ?")
 	if err != nil {
 		return nil, err
 	}
@@ -143,13 +144,14 @@ func GetSpikeById(id string) (*orm.Spike, error) {
 	s.ID = id
 	if rows.Next() {
 		var cId int
-		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
+		err := rows.Scan(&cId, &s.Quantity, &s.Withholding, &s.PurchaseLimit, &s.AccessRule, &s.StartTime, &s.EndTime)
 		if err != nil {
 			return nil, err
 		}
 		s.CommodityID = strconv.Itoa(cId)
+		return s, nil
 	}
-	return s, nil
+	return nil, nil
 }
 
 func GetActiveSpike() ([]*orm.Spike, error) {

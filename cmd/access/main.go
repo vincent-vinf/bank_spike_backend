@@ -75,11 +75,14 @@ func (s *accessServer) IsAccessible(ctx context.Context, req *access.AccessReq) 
 	if err != nil {
 		return nil, err
 	}
+	if u == nil {
+		return &access.AccessRes{Result: false, Reason: "user does not exist"}, nil
+	}
 	res, reason, err := ft.Execute(ctx, u)
 	if err != nil {
 		return nil, err
 	}
-	/// TODO(vincent) 增加一个redis缓存层？？？
+	/// TODO(vincent) 增加一个缓存层？？？
 	return &access.AccessRes{Result: res, Reason: reason}, nil
 }
 
