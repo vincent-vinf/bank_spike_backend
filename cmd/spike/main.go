@@ -78,7 +78,7 @@ func main() {
 }
 
 func getRandHandler(c *gin.Context) {
-	/// TODO(vincent) 针对用户限流
+	/// TODO(vincent) 根据用户id限流
 	spikeId := c.Param("id")
 	randStr, err := redisx.Get(c, redisx.RandKey+spikeId)
 	if err == redis.Nil {
@@ -129,6 +129,8 @@ func getRandHandler(c *gin.Context) {
 }
 
 func spikeHandler(c *gin.Context) {
+	/// TODO 针对用户请求量限流，n倍以上时直接抛弃请求
+
 	spikeId := c.Param("id")
 	r := c.Param("rand")
 	pass, err := redisx.CheckUrl(c, spikeId, r)

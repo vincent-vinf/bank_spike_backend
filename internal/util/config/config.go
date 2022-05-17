@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&configPath, "config-path", "E:\\vincent\\repos\\bank_spike_backend\\configs\\config.yaml", "")
+	flag.StringVar(&configPath, "config-path", "configs/config.yaml", "")
 }
 
 func InitViper() {

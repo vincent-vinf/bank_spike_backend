@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	flag.IntVar(&port, "port", 8080, "")
+	flag.IntVar(&port, "port", 8085, "")
 	flag.Parse()
 	config.InitViper()
 }
