@@ -43,19 +43,19 @@ docker build --target order -t order-server:0.0.1 .
 
 - [ ] 并发测试程序
 
-- [ ] 针对用户id，访问接口频率限流
+- [x] 针对用户id，访问接口频率限流
 
   代码位置：插入 spike的`getRandHandler`和`spikeHandler`函数前
 
   当用户在一秒内访问了n次(比如10，可配置)以上时，直接返回429，最好通过redis实现
 
-- [ ] 针对ip限流，通过nginx-ingress配置完成
+- [x] 针对ip限流，通过nginx-ingress配置完成
 
-- [ ] 针对用户请求量限流，n倍以上时直接抛弃请求
+- [x] 针对用户请求量限流，n倍以上时直接抛弃请求
 
   代码位置：spike `spikeHandler`
 
-  若秒杀商品量为1000，k之后的请求其实毫无意义，直接返回sold out
+  若秒杀商品量为k，k之后的请求其实毫无意义，直接返回sold out
 
   此处的逻辑需要设计，保证商品在未买完的情况下，不会拒绝请求，可以将`getRestStock`库存判断提前到access之前
 
@@ -71,7 +71,7 @@ docker build --target order -t order-server:0.0.1 .
 
   增加redis缓存，暂存用户在某个活动的准入评测结果，缓存时间要设置的稍短(30s?待测试)
 
-- [ ] 订单操作
+- [x] 订单操作
 
   * 取消
   * 查看订单详情
