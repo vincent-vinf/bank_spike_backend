@@ -42,14 +42,14 @@ func Close() {
 	}
 }
 
-func Register(username, phone, passwd string) (int, error) {
+func Register(username, phone, passwd, idNumber, workStatus string, age int) (int, error) {
 	db := getInstance()
-	stmt, err := db.Prepare("insert into users (username , phone, passwd) VALUES (?,?,?)")
+	stmt, err := db.Prepare("insert into users (username , phone, passwd, id_number, work_status, age) VALUES (?,?,?,?,?,?)")
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
-	res, err := stmt.Exec(username, phone, passwd)
+	res, err := stmt.Exec(username, phone, passwd, idNumber, workStatus, age)
 	if err != nil {
 		return 0, err
 	}

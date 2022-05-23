@@ -4,6 +4,7 @@ import (
 	"bank_spike_backend/internal/db"
 	"bank_spike_backend/internal/util/config"
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -27,9 +28,12 @@ type loginForm struct {
 }
 
 type RegisterForm struct {
-	Username string `form:"username" json:"username" binding:"required"`
-	Phone    string `form:"phone" json:"phone" binding:"required"`
-	Passwd   string `form:"passwd" json:"passwd" binding:"required"`
+	Username   string `form:"username" json:"username" binding:"required"`
+	Phone      string `form:"phone" json:"phone" binding:"required"`
+	Passwd     string `form:"passwd" json:"passwd" binding:"required"`
+	IdNumber   string `form:"idNumber" json:"idNumber" binding:"required"`
+	WorkStatus string `form:"workStatus" json:"workStatus" binding:"required"`
+	Age        int    `form:"age" json:"age" binding:"required"`
 }
 
 // TokenUserInfo 结构体中的数据将会编码进token
@@ -118,6 +122,7 @@ func GenerateToken(id int) string {
 	if err != nil {
 		return ""
 	}
+	fmt.Printf("token (%v, %T)\n", token, token)
 	return token
 }
 

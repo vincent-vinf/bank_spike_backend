@@ -51,11 +51,26 @@ func main() {
 	spike := router.Group("/spike")
 	spike.Use(authMiddleware.MiddlewareFunc())
 	spike.GET("/", getSpikeList)
+	spike.GET("/:id", getSpikeById)
 	spike.POST("/", addSpike)
 	spike.DELETE("/:id", deleteSpike)
 	spike.PUT("/:id", updateSpike)
 
 	util.WatchSignalGrace(r, port)
+}
+
+func getSpikeById(context *gin.Context) {
+	spikeId := context.Param("id")
+	spike, err := db.GetSpikeById(spikeId)
+	if err != nil {
+		log.Println(err)
+		context.JSON(500, gin.H{
+			"error": "Server internal error",
+		})
+		return
+	}
+
+	context.JSON(200, spike)
 }
 
 func getSpikeList(context *gin.Context) {
