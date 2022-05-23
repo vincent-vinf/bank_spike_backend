@@ -18,32 +18,33 @@ RUN mkdir -p "bin" && \
     go build -o bin/admin-service cmd/admin/main.go && \
     go build -o bin/order-service cmd/order/main.go
 
+# gcr.io/distroless/static
 # access
-FROM gcr.io/distroless/static as access
+FROM debian as access
 WORKDIR /
 COPY --from=builder /app/bin/access-service /
 USER root
 
 # spike
-FROM gcr.io/distroless/static as spike
+FROM debian as spike
 WORKDIR /
 COPY --from=builder /app/bin/spike-service /
 USER root
 
 # user
-FROM gcr.io/distroless/static as user
+FROM debian as user
 WORKDIR /
 COPY --from=builder /app/bin/user-service /
 USER root
 
 # admin
-FROM gcr.io/distroless/static as admin
+FROM debian as admin
 WORKDIR /
 COPY --from=builder /app/bin/admin-service /
 USER root
 
 # order
-FROM gcr.io/distroless/static as order
+FROM debian as order
 WORKDIR /
 COPY --from=builder /app/bin/order-service /
 USER root

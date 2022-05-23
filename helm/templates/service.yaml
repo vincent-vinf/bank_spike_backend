@@ -1,15 +1,17 @@
+{{- range .Values.microservices}}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "helm.fullname" . }}
-  labels:
-    {{- include "helm.labels" . | nindent 4 }}
+  name: spike-{{ .name }}
 spec:
-  type: {{ .Values.service.type }}
+  type: NodePort
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    {{- range .service }}
+    - port: {{ . }}
+      targetPort: {{ . }}
       protocol: TCP
-      name: http
+    {{- end }}
   selector:
-    {{- include "helm.selectorLabels" . | nindent 4 }}
+    app: spike-{{ .name }}
+---
+{{- end}}

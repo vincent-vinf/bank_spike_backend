@@ -112,9 +112,11 @@ func getAuthMiddleware(secret []byte, timeout, maxRefresh time.Duration, isAdmin
 }
 
 func GenerateToken(id int) string {
-	token, _, err := authMiddleware.TokenGenerator(jwt.MapClaims{
-		IdentityKey: strconv.Itoa(id),
-	})
+	token, _, err := authMiddleware.TokenGenerator(
+		&TokenUserInfo{
+			ID: strconv.Itoa(id),
+		},
+	)
 	if err != nil {
 		return ""
 	}

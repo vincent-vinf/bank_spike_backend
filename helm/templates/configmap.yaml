@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spike-config
+data:
+  config.yaml: |
+    mysql:
+      host: 47.97.9.122
+      port: 3306
+      user: root
+      passwd: vincentDockerMysql2021
+      database: bank_spike
+    # db2struct --host 47.97.9.122 -d bank_spike -ingress-nginx.tar users --package myGoPackage --struct testTable -p --user root
+
+    jwt:
+      secret: 123
+      timeout: 24h
+      maxRefresh: 48h
+
+    admin_jwt:
+      secret: 12345
+      timeout: 24h
+      maxRefresh: 48h
+
+    redis:
+      db: 2
+      endpoint: 47.97.9.122:6379
+      passwd: 123abc456d@csl
+
+    spike:
+      rand_url_key: rand_url_key123
+
+    rabbitmq:
+      host: 47.97.9.122
+      port: 5672
+      user: vincent
+      passwd: vincentDockerRabbit2021
+
