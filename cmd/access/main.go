@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -59,6 +60,18 @@ type accessServer struct{}
 
 func (s *accessServer) IsAccessible(ctx context.Context, req *access.AccessReq) (*access.AccessRes, error) {
 	log.Printf("check accessible user: %s, spike: %s\n", req.UserId, req.SpikeId)
+	redisId := fmt.Sprintf("spike%s:user%s", req.SpikeId, req.UserId)
+	redisRes, err := redisx.GetAccess(ctx, redisId)
+	if err != nil {
+		return nil, err
+	}
+	if len(redisRes) != 0 {
+		result, _ := strconv.ParseBool(redisRes["result"])
+		return &access.AccessRes{
+			Result: result,
+			Reason: redisRes["reason"],
+		}, nil
+	}
 	f, isFound := filterCache.Get(req.SpikeId)
 	var ft filter.Filter
 	if isFound {
@@ -83,6 +96,7 @@ func (s *accessServer) IsAccessible(ctx context.Context, req *access.AccessReq) 
 		return nil, err
 	}
 	/// TODO(vincent) 增加一个缓存层？？？
+	redisx.SetAccess(ctx, redisId, res, reason, time.Second*30)
 	return &access.AccessRes{Result: res, Reason: reason}, nil
 }
 

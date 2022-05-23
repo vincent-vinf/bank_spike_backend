@@ -38,9 +38,9 @@
 
   代码位置：spike `spikeHandler`
 
-- [ ] admin，秒杀活动CRUD
+- [x] admin，秒杀活动CRUD
 
-- [ ] 增加access缓存层
+- [x] 增加access缓存层
 
   代码位置：access `IsAccessible`
 

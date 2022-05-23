@@ -52,6 +52,5 @@ func GenerateUpdateSql(s interface{}) (str string) {
 		}
 	}
 	str = str[:len(str)-1]
-	fmt.Println(str)
 	return
 }
