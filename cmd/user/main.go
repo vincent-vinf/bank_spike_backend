@@ -6,6 +6,7 @@ import (
 	"bank_spike_backend/internal/util/config"
 	jwtx "bank_spike_backend/internal/util/jwt"
 	"flag"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
 )
@@ -46,7 +47,41 @@ func main() {
 	// Refresh time can be longer than token timeout
 	auth.GET("/refresh_token", authMiddleware.RefreshHandler)
 
+	spike := router.Group("/spike")
+	spike.Use(authMiddleware.MiddlewareFunc())
+	spike.GET("/", getSpikeList)
+	spike.GET("/:id", getSpikeById)
+
 	util.WatchSignalGrace(r, port)
+}
+
+func getSpikeById(context *gin.Context) {
+	spikeId := context.Param("id")
+	spike, err := db.GetSpikeById(spikeId)
+	if err != nil {
+		log.Println(err)
+		context.JSON(500, gin.H{
+			"error": "Server internal error",
+		})
+		return
+	}
+
+	context.JSON(200, spike)
+}
+
+func getSpikeList(context *gin.Context) {
+	list, err := db.GetSpikeList()
+	if err != nil {
+		log.Println(err)
+		context.JSON(500, gin.H{
+			"error": "Server internal error",
+		})
+		return
+	}
+
+	context.JSON(200, gin.H{
+		"list": list,
+	})
 }
 
 func registerHandler(c *gin.Context) {
@@ -73,7 +108,7 @@ func registerHandler(c *gin.Context) {
 		return
 	}
 
-	id, err := db.Register(registerForm.Username, registerForm.Phone, registerForm.Passwd)
+	id, err := db.Register(registerForm.Username, registerForm.Phone, registerForm.Passwd, registerForm.IdNumber, registerForm.WorkStatus, registerForm.Age)
 	if err != nil {
 		log.Println(err)
 		c.JSON(500, gin.H{
@@ -81,6 +116,8 @@ func registerHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	fmt.Printf("id (%v, %T)\n", id, id)
 
 	c.JSON(200, gin.H{
 		"token": jwtx.GenerateToken(id),

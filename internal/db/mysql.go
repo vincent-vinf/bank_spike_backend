@@ -2,6 +2,7 @@ package db
 
 import (
 	"bank_spike_backend/internal/orm"
+	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
 	"database/sql"
 	"errors"
@@ -41,14 +42,14 @@ func Close() {
 	}
 }
 
-func Register(username, phone, passwd string) (int, error) {
+func Register(username, phone, passwd, idNumber, workStatus string, age int) (int, error) {
 	db := getInstance()
-	stmt, err := db.Prepare("insert into users (username , phone, passwd) VALUES (?,?,?)")
+	stmt, err := db.Prepare("insert into users (username , phone, passwd, id_number, work_status, age) VALUES (?,?,?,?,?,?)")
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
-	res, err := stmt.Exec(username, phone, passwd)
+	res, err := stmt.Exec(username, phone, passwd, idNumber, workStatus, age)
 	if err != nil {
 		return 0, err
 	}
@@ -229,4 +230,103 @@ func InsertOrder(order *orm.Order) error {
 	}
 	order.ID = strconv.Itoa(int(id))
 	return nil
+}
+
+// 管理员秒杀
+
+func AddSpike(spike *orm.Spike) (int, error) {
+	fmt.Printf("spike (%v, %T)\n", spike, spike)
+	db := getInstance()
+	stmt, err := db.Prepare("insert into spike (commodity_id , quantity, access_rule, start_time, end_time) VALUES (?,?,?,?,?)")
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+	res, err := stmt.Exec(spike.CommodityID, spike.Quantity, spike.AccessRule, spike.StartTime, spike.EndTime)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return int(id), nil
+}
+
+func DelSpike(id string) (bool, error) {
+	// 如果未到开始时间，直接删除；开始后无法取消
+	db := getInstance()
+	stmt, err := db.Prepare("select start_time from spike where id=?")
+	if err != nil {
+		return false, err
+	}
+	defer stmt.Close()
+	row := stmt.QueryRow(id)
+	var startTime time.Time
+	err = row.Scan(&startTime)
+	if err != nil {
+		return false, err
+	}
+	if time.Now().Before(startTime) {
+		stmt, err = db.Prepare("delete from spike where id=?")
+		if err != nil {
+			return false, err
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(id)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func GetSpikeList() ([]*orm.Spike, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select * from spike")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var res []*orm.Spike
+	for rows.Next() {
+		var sid, cid int
+		s := &orm.Spike{}
+
+		err := rows.Scan(&sid, &cid, &s.Quantity, &s.Withholding, &s.PurchaseLimit, &s.AccessRule, &s.StartTime, &s.EndTime)
+		if err != nil {
+			return nil, err
+		}
+		s.ID = strconv.Itoa(sid)
+		s.CommodityID = strconv.Itoa(cid)
+
+		res = append(res, s)
+	}
+	return res, nil
+}
+
+func UpdateSpike(id string, spike *orm.Spike) (bool, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("update spike set " + util.GenerateUpdateSql(spike) + " where id=?")
+	if err != nil {
+		return false, err
+	}
+
+	res, err := stmt.Exec(id)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
