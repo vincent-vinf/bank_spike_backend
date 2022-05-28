@@ -2,9 +2,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: spike-backend-ingress
-
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    traefik.ingress.kubernetes.io/rule-type: "PathPrefixStrip"
 spec:
-{{/*  ingressClassName: nginx-spike-backend*/}}
   rules:
     - host: spike.vinf.top
       http:
@@ -14,5 +15,26 @@ spec:
             backend:
               service:
                 name: spike-user-service
+                port:
+                  number: 8080
+          - path: /spike
+            pathType: Prefix
+            backend:
+              service:
+                name: spike-spike-service
+                port:
+                  number: 8080
+          - path: /order
+            pathType: Prefix
+            backend:
+              service:
+                name: spike-order-service
+                port:
+                  number: 8080
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: spike-admin-service
                 port:
                   number: 8080

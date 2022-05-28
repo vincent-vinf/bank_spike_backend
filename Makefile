@@ -1,4 +1,4 @@
-VERSION = 0.0.2
+VERSION = latest
 WORK_DIR = .
 REGISTRY = registry.cn-qingdao.aliyuncs.com/adpc/
 
@@ -28,3 +28,5 @@ push:
 	docker push $(REGISTRY)spike-admin-service:$(VERSION)
 	docker push $(REGISTRY)spike-order-service:$(VERSION)
 
+tar:
+	 tar -zcvf spike-chart-$(VERSION).tar.gz -C ./helm .
