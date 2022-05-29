@@ -28,5 +28,5 @@ push:
 	docker push $(REGISTRY)spike-admin-service:$(VERSION)
 	docker push $(REGISTRY)spike-order-service:$(VERSION)
 
-tar:
+tar_chart:
 	 tar -zcvf spike-chart-$(VERSION).tar.gz -C ./helm .

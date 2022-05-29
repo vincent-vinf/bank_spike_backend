@@ -129,8 +129,6 @@ func getRandHandler(c *gin.Context) {
 }
 
 func spikeHandler(c *gin.Context) {
-	/// TODO 针对用户请求量限流，n倍以上时直接抛弃请求
-
 	spikeId := c.Param("id")
 	r := c.Param("rand")
 	pass, err := redisx.CheckUrl(c, spikeId, r)
@@ -140,6 +138,11 @@ func spikeHandler(c *gin.Context) {
 	}
 	if !pass {
 		c.JSON(404, gin.H{"message": "page not found"})
+		return
+	}
+
+	if getRestStock(c, spikeId) <= 0 {
+		c.JSON(200, gin.H{"status": "fail", "msg": "sold out"})
 		return
 	}
 
@@ -163,11 +166,6 @@ func spikeHandler(c *gin.Context) {
 	}
 
 	/// TODO(vincent)订单已存在情况判断
-
-	if getRestStock(c, spikeId) <= 0 {
-		c.JSON(200, gin.H{"status": "fail", "msg": "sold out"})
-		return
-	}
 
 	restStore, err := redisx.DecStore(c, redisx.SpikeStoreKey+spikeId, 1)
 	if err != nil {
