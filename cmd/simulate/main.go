@@ -18,9 +18,9 @@ const (
 	UserPrefix  = "s-user-t-"
 	PhonePrefix = "+86-t-"
 	IdNumber    = "s-no-t-"
-	UserNum     = 10 // 用户数量
-	UserPerNum  = 1  // 每个用户请求最大数量
-	SpikeId     = "2"
+	UserNum     = 100 // 用户数量
+	UserPerNum  = 1   // 每个用户请求最大数量
+	SpikeId     = "4"
 	BaseUrl     = "http://127.0.0.1:"
 )
 
@@ -54,70 +54,32 @@ type spikeSimulateResult struct {
 }
 
 var wg sync.WaitGroup
+var mux sync.Mutex
 var tokenInfos []*tokenInfo
 var sRes spikeSimulateResult
 
 func main() {
-	cnt := 0
-
 	// 模拟注册
 	rand.Seed(time.Now().UnixNano())
-	for i := 8; i < UserNum+8; i++ {
+	for i := 0; i < UserNum; i++ {
+		wg.Add(1)
 		go func(i int) {
-			wg.Add(1)
-			res, err := SimulatePost(
-				UrlMap["user"]+"register",
-				map[string]interface{}{
-					"username":   UserPrefix + strconv.Itoa(i),
-					"phone":      PhonePrefix + strconv.Itoa(i),
-					"idNumber":   IdNumber + strconv.Itoa(i),
-					"workStatus": WorkStatus[rand.Intn(len(WorkStatus))],
-					"passwd":     "123456",
-					"age":        rand.Intn(33) + 16,
-				},
-				map[string]string{
-					"Content-Type": "application/json",
-				},
-			)
-			if err != nil || res["error"] != nil {
-				log.Fatal("simulate register failed")
-			}
-
-			cnt++
-			tokenInfos = append(tokenInfos, &tokenInfo{
-				username: UserPrefix + strconv.Itoa(i),
-				token:    res["token"].(string),
-			})
+			// 模拟注册
+			//SimulateRegister(i)
+			// 模拟登录
+			SimulateLogin(i)
 			wg.Done()
 		}(i)
+		if (i+1)%10 == 0 {
+			wg.Wait()
+		}
 	}
-	wg.Wait()
-	log.Println(cnt, " registered successfully")
-
-	// 测试：模拟登录
-	//res, err := SimulatePost(
-	//	UrlMap["user"]+"login",
-	//	map[string]interface{}{
-	//		"phone":  PhonePrefix + strconv.Itoa(0),
-	//		"passwd": "123456",
-	//	},
-	//	map[string]string{
-	//		"Content-Type": "application/json; charset=utf-8",
-	//	},
-	//)
-	//if err != nil || res["error"] != nil {
-	//	log.Fatal("simulate register failed")
-	//}
-	//
-	//cnt++
-	//tokenInfos = append(tokenInfos, &tokenInfo{
-	//	username: UserPrefix + strconv.Itoa(0),
-	//	token:    res["token"].(string),
-	//})
+	log.Println(len(tokenInfos), " registered successfully")
 
 	// 获取 spike 开始时间、定时任务
 	spike, err := SimulateGet(UrlMap["user"]+"spike/"+SpikeId, map[string]string{"Authorization": "Bearer " + tokenInfos[0].token})
 	if err != nil {
+		log.Println("err", err)
 		log.Fatal("get spike start time failed")
 	}
 	startTime, err := time.Parse("2006-01-02T15:04:05Z07:00", spike["StartTime"].(string))
@@ -130,48 +92,114 @@ func main() {
 	wg.Add(1) // 等待定时任务完成
 	_, err = c.AddFunc(spec, SimulateSpike)
 	if err != nil {
+		log.Println("err", err)
 		log.Fatal("cron start failed")
 	}
 	c.Start()
+	log.Println("cron start successfully")
 
 	// 结果打印（用户 id，秒杀结果，时间）、超卖检验
 	wg.Wait() // 等待所有用户秒杀结束
+	log.Println("spike end")
 	fmt.Println(sRes)
+}
+
+func SimulateRegister(i int) {
+	res, err := SimulatePost(
+		UrlMap["user"]+"register",
+		map[string]interface{}{
+			"username":   UserPrefix + strconv.Itoa(i),
+			"phone":      PhonePrefix + strconv.Itoa(i),
+			"idNumber":   IdNumber + strconv.Itoa(i),
+			"workStatus": WorkStatus[rand.Intn(len(WorkStatus))],
+			"passwd":     "123456",
+			"age":        rand.Intn(33) + 16,
+		},
+		map[string]string{
+			"Content-Type": "application/json",
+		},
+	)
+	if err != nil || res["error"] != nil {
+		log.Println("err", err)
+		log.Println("res", res)
+		log.Fatal("simulate register failed")
+	}
+
+	mux.Lock()
+	tokenInfos = append(tokenInfos, &tokenInfo{
+		username: UserPrefix + strconv.Itoa(i),
+		token:    res["token"].(string),
+	})
+	mux.Unlock()
+}
+
+func SimulateLogin(i int) {
+	res, err := SimulatePost(
+		UrlMap["user"]+"login",
+		map[string]interface{}{
+			"phone":  PhonePrefix + strconv.Itoa(i),
+			"passwd": "123456",
+		},
+		map[string]string{
+			"Content-Type": "application/json; charset=utf-8",
+		},
+	)
+	if err != nil || res["error"] != nil {
+		log.Println("err", err)
+		log.Println("res", res)
+		log.Fatal("simulate login failed")
+	}
+
+	mux.Lock()
+	tokenInfos = append(tokenInfos, &tokenInfo{
+		username: UserPrefix + strconv.Itoa(0),
+		token:    res["token"].(string),
+	})
+	mux.Unlock()
 }
 
 // SimulateSpike 模拟秒杀
 func SimulateSpike() {
 	for _, info := range tokenInfos {
-		wg.Add(1)
-		go func(info *tokenInfo) {
-			// 模拟获取随机秒杀链接
-			res, err := SimulateGet(UrlMap["spike"]+SpikeId, map[string]string{"Authorization": "Bearer " + info.token})
-			if err != nil {
-				log.Fatal("simulate spike failed")
-			}
-			// 模拟秒杀
-			res, err = SimulatePost(
-				UrlMap["spike"]+SpikeId+"/"+res["token"].(string),
-				nil,
-				map[string]string{"Authorization": "Bearer " + info.token},
-			)
-			// 保存结果
-			if res["status"] != nil && res["status"].(string) == "success" {
-				sRes.success.cnt++
-				sRes.success.list = append(sRes.success.list, spikeUserResult{
-					username: info.username,
-					res:      res,
-				})
-			} else {
-				sRes.fail.cnt++
-				sRes.fail.list = append(sRes.fail.list, spikeUserResult{
-					username: info.username,
-					res:      res,
-				})
-			}
-			log.Println(info.username, "finish spike")
-			wg.Done()
-		}(info)
+		// 模拟用户同一时间点击 UserPerNum 次
+		for i := 0; i < UserPerNum; i++ {
+			wg.Add(1)
+			go func(info *tokenInfo) {
+				// 模拟获取随机秒杀链接
+				res, err := SimulateGet(UrlMap["spike"]+SpikeId, map[string]string{"Authorization": "Bearer " + info.token})
+				if err != nil {
+					log.Println("err", err)
+					log.Fatal("simulate spike failed")
+				}
+				// 是否正常获取到 token
+				if _, ok := res["error"]; !ok {
+					// 模拟秒杀
+					res, err = SimulatePost(
+						UrlMap["spike"]+SpikeId+"/"+res["token"].(string),
+						nil,
+						map[string]string{"Authorization": "Bearer " + info.token},
+					)
+				}
+
+				mux.Lock()
+				// 保存结果
+				if res["status"] != nil && res["status"].(string) == "success" {
+					sRes.success.cnt++
+					sRes.success.list = append(sRes.success.list, spikeUserResult{
+						username: info.username,
+						res:      res,
+					})
+				} else {
+					sRes.fail.cnt++
+					sRes.fail.list = append(sRes.fail.list, spikeUserResult{
+						username: info.username,
+						res:      res,
+					})
+				}
+				mux.Unlock()
+				wg.Done()
+			}(info)
+		}
 	}
 	wg.Done()
 }
@@ -208,7 +236,6 @@ func SimulatePost(url string, data map[string]interface{}, headers map[string]st
 		req.Header.Add(k, v)
 	}
 	res, err := http.DefaultClient.Do(req)
-	fmt.Printf("err (%v, %T)\n", err, err)
 	if res == nil {
 		fmt.Println(data)
 	}
