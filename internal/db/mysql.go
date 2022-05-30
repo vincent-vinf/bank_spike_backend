@@ -155,34 +155,33 @@ func GetSpikeById(id string) (*orm.Spike, error) {
 	return nil, nil
 }
 
-//func GetActiveSpike() ([]*orm.Spike, error) {
-//	db := getInstance()
-//	stmt, err := db.Prepare("select commodity_id,quantity,access_rule,start_time,end_time from spike where start_time <= ? and end_time >= ?")
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer stmt.Close()
-//	now := time.Now()
-//	rows, err := stmt.Query(now, now)
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer rows.Close()
-//	var res []*orm.Spike
-//	for rows.Next() {
-//		var cId int
-//		s := &orm.Spike{}
-//
-//		err := rows.Scan(&cId, &s.Quantity, &s.AccessRule, &s.StartTime, &s.EndTime)
-//		if err != nil {
-//			return nil, err
-//		}
-//		s.CommodityID = strconv.Itoa(cId)
-//
-//		res = append(res, s)
-//	}
-//	return res, nil
-//}
+func GetOrder(uid string, orderId string) (*orm.Order, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select spike_id,quantity,state,create_time from orders where user_id = ? and id = ?")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(uid, orderId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var s *orm.Order
+	if rows.Next() {
+		var sId int
+		s = &orm.Order{UserID: uid}
+
+		err := rows.Scan(&sId, &s.Quantity, &s.State, &s.CreateTime)
+		if err != nil {
+			return nil, err
+		}
+		s.ID = orderId
+		s.SpikeID = strconv.Itoa(sId)
+		s.UserID = uid
+	}
+	return s, nil
+}
 
 func GetOrderList(uid string) ([]*orm.Order, error) {
 	db := getInstance()
@@ -248,6 +247,17 @@ func IsExistOrder(userId, spikeId string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func SetOrderState(oId, state string) error {
+	db := getInstance()
+	stmt, err := db.Prepare("update orders set state = ? where id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(state, oId)
+	return err
 }
 
 // 管理员秒杀

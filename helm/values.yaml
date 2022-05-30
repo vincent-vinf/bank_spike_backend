@@ -2,7 +2,7 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-pullPolicy: IfNotPresent
+pullPolicy: Always
 
 microservices:
   - name: access-service

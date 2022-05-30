@@ -49,6 +49,7 @@ func main() {
 	router.GET("", listOrderHandler)
 	router.GET("/:id", getOrderByIdHandler)
 	router.POST("/pay/:id", payHandler)
+	router.POST("/cancel/:id", cancelHandler)
 
 	c := mq.NewClient()
 	dealMqOrder(c.Consume())
@@ -58,11 +59,37 @@ func main() {
 }
 
 func payHandler(c *gin.Context) {
+	orderId := c.Param("id")
+	err := db.SetOrderState(orderId, orm.OrderPaid)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "pay order fail"})
+	}
+	// TODO 加锁减库存
+	//https://zhaoyixing.github.io/2018/01/10/mysql-update-safe-md/
+	c.JSON(200, gin.H{"status": "success", "msg": "payment successful"})
+}
+
+func cancelHandler(c *gin.Context) {
 
 }
 
 func getOrderByIdHandler(c *gin.Context) {
+	t, _ := c.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
 
+	orderId := c.Param("id")
+
+	o, err := db.GetOrder(user.ID, orderId)
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, gin.H{"error": "get order fail"})
+		return
+	}
+	if o == nil {
+		c.JSON(404, gin.H{"error": "order not found"})
+		return
+	}
+	c.JSON(200, o)
 }
 
 func listOrderHandler(c *gin.Context) {

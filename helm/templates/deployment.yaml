@@ -12,6 +12,7 @@ spec:
     metadata:
       labels:
         app: spike-{{ .name }}
+        date: "{{ now | unixEpoch }}"
     spec:
       containers:
         - name: {{ .name }}
