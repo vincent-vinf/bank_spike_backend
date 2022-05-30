@@ -113,7 +113,7 @@ func getRandHandler(c *gin.Context) {
 			return
 		}
 		if !ok {
-			randStr, err = redisx.Get(c, s.ID)
+			randStr, err = redisx.Get(c, redisx.RandKey+spikeId)
 			if err != nil {
 				internalErr(c, err)
 				return

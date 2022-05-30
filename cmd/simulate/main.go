@@ -74,7 +74,7 @@ func main() {
 			wg.Wait()
 		}
 	}
-	log.Println(len(tokenInfos), " registered successfully")
+	log.Println(len(tokenInfos), "register/login successfully")
 
 	// 获取 spike 开始时间、定时任务
 	spike, err := SimulateGet(UrlMap["user"]+"spike/"+SpikeId, map[string]string{"Authorization": "Bearer " + tokenInfos[0].token})
@@ -88,7 +88,14 @@ func main() {
 	}
 
 	c := cron.New(cron.WithSeconds())
-	spec := fmt.Sprintf("%d %d %d %d %d ?", startTime.Second(), startTime.Minute(), startTime.Hour(), startTime.Day(), startTime.Month())
+	var spec string
+	if startTime.Before(time.Now()) {
+		// 如果活动已开始 5 秒后自动执行
+		runTime := time.Now().Add(time.Second * 1)
+		spec = fmt.Sprintf("%d %d %d %d %d ?", runTime.Second(), runTime.Minute(), runTime.Hour(), runTime.Day(), runTime.Month())
+	} else {
+		spec = fmt.Sprintf("%d %d %d %d %d ?", startTime.Second(), startTime.Minute(), startTime.Hour(), startTime.Day(), startTime.Month())
+	}
 	wg.Add(1) // 等待定时任务完成
 	_, err = c.AddFunc(spec, SimulateSpike)
 	if err != nil {
@@ -152,7 +159,7 @@ func SimulateLogin(i int) {
 
 	mux.Lock()
 	tokenInfos = append(tokenInfos, &tokenInfo{
-		username: UserPrefix + strconv.Itoa(0),
+		username: UserPrefix + strconv.Itoa(i),
 		token:    res["token"].(string),
 	})
 	mux.Unlock()
@@ -160,6 +167,7 @@ func SimulateLogin(i int) {
 
 // SimulateSpike 模拟秒杀
 func SimulateSpike() {
+	log.Println("spike begin")
 	for _, info := range tokenInfos {
 		// 模拟用户同一时间点击 UserPerNum 次
 		for i := 0; i < UserPerNum; i++ {
