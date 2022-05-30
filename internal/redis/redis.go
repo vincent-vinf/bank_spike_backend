@@ -98,9 +98,9 @@ func CheckUrl(ctx context.Context, spikeId, rand string) (bool, error) {
 	return false, nil
 }
 
-func SetAccess(ctx context.Context, key string, result bool, reason string, timeout time.Duration) (bool, error) {
+func SetAccess(ctx context.Context, key string, access map[string]string, timeout time.Duration) (bool, error) {
 	getInstance()
-	err := rdb.HMSet(ctx, key, map[string]string{"result": strconv.FormatBool(result), "reason": reason}).Err()
+	err := rdb.HMSet(ctx, key, access).Err()
 	if err != nil {
 		return false, err
 	}

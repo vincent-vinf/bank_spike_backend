@@ -232,6 +232,24 @@ func InsertOrder(order *orm.Order) error {
 	return nil
 }
 
+func IsExistOrder(userId, spikeId string) (bool, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select id from orders where user_id = ? and spike_id = ?")
+	if err != nil {
+		return false, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(userId, spikeId)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		return true, nil
+	}
+	return false, nil
+}
+
 // 管理员秒杀
 
 func AddSpike(spike *orm.Spike) (int, error) {

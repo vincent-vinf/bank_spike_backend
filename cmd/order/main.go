@@ -5,9 +5,11 @@ import (
 	"bank_spike_backend/internal/mq"
 	"bank_spike_backend/internal/orm"
 	"bank_spike_backend/internal/pb/order"
+	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
 	jwtx "bank_spike_backend/internal/util/jwt"
+	"context"
 	"flag"
 	"github.com/gin-gonic/gin"
 	"log"
@@ -79,6 +81,22 @@ func dealMqOrder(ch <-chan *order.OrderInfo) {
 	go func() {
 		for info := range ch {
 			log.Println(info)
+			// 判断订单是否存在
+			isExist, err := db.IsExistOrder(info.UserId, info.SpikeId)
+			if err != nil || isExist {
+				if err != nil {
+					log.Println(err)
+				} else {
+					log.Println("order already exists")
+				}
+				// 减库存
+				lua, err := redisx.DecStore(context.Background(), redisx.SpikeStoreKey+info.SpikeId, -1)
+				if err != nil {
+					log.Println(err)
+				}
+				log.Println(lua)
+				continue
+			}
 			o := &orm.Order{
 				UserID:     info.UserId,
 				SpikeID:    info.SpikeId,
@@ -86,7 +104,7 @@ func dealMqOrder(ch <-chan *order.OrderInfo) {
 				State:      orm.OrderOrdered,
 				CreateTime: time.Now(),
 			}
-			err := db.InsertOrder(o)
+			err = db.InsertOrder(o)
 			if err != nil {
 				log.Println(err)
 			}

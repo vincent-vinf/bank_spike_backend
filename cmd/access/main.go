@@ -96,7 +96,7 @@ func (s *accessServer) IsAccessible(ctx context.Context, req *access.AccessReq) 
 		return nil, err
 	}
 	/// TODO(vincent) 增加一个缓存层？？？
-	redisx.SetAccess(ctx, redisId, res, reason, time.Second*30)
+	redisx.SetAccess(ctx, redisId, map[string]string{"result": strconv.FormatBool(res), "reason": reason}, time.Second*30)
 	return &access.AccessRes{Result: res, Reason: reason}, nil
 }
 
