@@ -165,8 +165,6 @@ func spikeHandler(c *gin.Context) {
 		return
 	}
 
-	/// TODO(vincent)订单已存在情况判断
-
 	restStore, err := redisx.DecStore(c, redisx.SpikeStoreKey+spikeId, 1)
 	if err != nil {
 		internalErr(c, err)
@@ -202,7 +200,6 @@ func getRestStock(ctx context.Context, spikeId string) (res int) {
 			return
 		}
 		s := spike.(*orm.Spike)
-		log.Println(s)
 		numStr = strconv.Itoa(s.Withholding)
 		ok, err := redisx.SetNX(ctx, redisx.SpikeStoreKey+spikeId, numStr, s.EndTime.Sub(time.Now()))
 		if err != nil {

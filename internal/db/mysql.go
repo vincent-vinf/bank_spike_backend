@@ -130,6 +130,48 @@ func GetUserById(id string) (*orm.User, error) {
 	return nil, nil
 }
 
+func DecreaseStock(spikeId string) (bool, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("update spike set withholding = withholding - 1 where id in (select spike_id from orders where id = ?) and withholding - 1 > 0")
+	if err != nil {
+		return false, err
+	}
+	defer stmt.Close()
+	re, err := stmt.Exec(spikeId)
+	if err != nil {
+		return false, err
+	}
+	affected, err := re.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if affected == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
+func IncreaseStock(spikeId string) (bool, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("update spike set withholding = withholding + 1 where id in (select spike_id from orders where id = ?)")
+	if err != nil {
+		return false, err
+	}
+	defer stmt.Close()
+	re, err := stmt.Exec(spikeId)
+	if err != nil {
+		return false, err
+	}
+	affected, err := re.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if affected == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
 func GetOrder(uid string, orderId string) (*orm.Order, error) {
 	db := getInstance()
 	stmt, err := db.Prepare("select spike_id,quantity,state,create_time from orders where user_id = ? and id = ?")
@@ -224,15 +266,22 @@ func IsExistOrder(userId, spikeId string) (bool, error) {
 	return false, nil
 }
 
-func SetOrderState(oId, state string) error {
+func SetOrderState(oId, state, srcState string) (bool, error) {
 	db := getInstance()
-	stmt, err := db.Prepare("update orders set state = ? where id = ?")
+	stmt, err := db.Prepare("update orders set state = ? where id = ? and state = ?")
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(state, oId)
-	return err
+	re, err := stmt.Exec(state, oId, srcState)
+	if err != nil {
+		return false, err
+	}
+	affected, err := re.RowsAffected()
+	if err != nil || affected == 0 {
+		return false, err
+	}
+	return true, nil
 }
 
 // 管理员秒杀
