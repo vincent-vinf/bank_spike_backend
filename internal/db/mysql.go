@@ -2,6 +2,7 @@ package db
 
 import (
 	"bank_spike_backend/internal/orm"
+	"bank_spike_backend/internal/orm/response"
 	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
 	"database/sql"
@@ -129,32 +130,6 @@ func GetUserById(id string) (*orm.User, error) {
 	return nil, nil
 }
 
-func GetSpikeById(id string) (*orm.Spike, error) {
-	db := getInstance()
-	stmt, err := db.Prepare("select commodity_id,quantity,withholding,purchase_limit,access_rule,start_time,end_time from spike where id = ?")
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-	rows, err := stmt.Query(id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	s := &orm.Spike{}
-	s.ID = id
-	if rows.Next() {
-		var cId int
-		err := rows.Scan(&cId, &s.Quantity, &s.Withholding, &s.PurchaseLimit, &s.AccessRule, &s.StartTime, &s.EndTime)
-		if err != nil {
-			return nil, err
-		}
-		s.CommodityID = strconv.Itoa(cId)
-		return s, nil
-	}
-	return nil, nil
-}
-
 func GetOrder(uid string, orderId string) (*orm.Order, error) {
 	db := getInstance()
 	stmt, err := db.Prepare("select spike_id,quantity,state,create_time from orders where user_id = ? and id = ?")
@@ -262,6 +237,32 @@ func SetOrderState(oId, state string) error {
 
 // 管理员秒杀
 
+func GetSpikeById(id string) (*orm.Spike, error) {
+	db := getInstance()
+	stmt, err := db.Prepare("select commodity_id,quantity,withholding,purchase_limit,access_rule,start_time,end_time from spike where id = ?")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	s := &orm.Spike{}
+	s.ID = id
+	if rows.Next() {
+		var cId int
+		err := rows.Scan(&cId, &s.Quantity, &s.Withholding, &s.PurchaseLimit, &s.AccessRule, &s.StartTime, &s.EndTime)
+		if err != nil {
+			return nil, err
+		}
+		s.CommodityID = strconv.Itoa(cId)
+		return s, nil
+	}
+	return nil, nil
+}
+
 func AddSpike(spike *orm.Spike) (int, error) {
 	fmt.Printf("spike (%v, %T)\n", spike, spike)
 	db := getInstance()
@@ -333,6 +334,81 @@ func GetSpikeList() ([]*orm.Spike, error) {
 		}
 		s.ID = strconv.Itoa(sid)
 		s.CommodityID = strconv.Itoa(cid)
+
+		res = append(res, s)
+	}
+	return res, nil
+}
+
+// 用户秒杀
+
+func GetSpikeByIdUser(id string) (response.SpikeDetail, error) {
+	db := getInstance()
+	var s response.SpikeDetail
+	var sid, cid int
+
+	stmt, err := db.Prepare("select * from spike where id = ?")
+	if err != nil {
+		return s, err
+	}
+	defer stmt.Close()
+	row := stmt.QueryRow(id)
+	if err != nil {
+		return s, err
+	}
+	err = row.Scan(&sid, &cid, &s.Quantity, &s.Withholding, &s.PurchaseLimit, &s.AccessRule, &s.StartTime, &s.EndTime)
+	s.ID = strconv.Itoa(sid)
+	s.CommodityID = strconv.Itoa(cid)
+
+	stmt2, err := db.Prepare("select name, price from commodity where id=?")
+	if err != nil {
+		return s, err
+	}
+	defer stmt2.Close()
+	row2 := stmt2.QueryRow(cid)
+	err = row2.Scan(&s.CommodityName, &s.CommodityPrice)
+	if err != nil {
+		return s, err
+	}
+	return s, nil
+}
+
+func GetSpikeListUser() ([]*response.SpikeDetail, error) {
+	db := getInstance()
+	var res []*response.SpikeDetail
+
+	stmt, err := db.Prepare("select * from spike")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sid, cid int
+		s := &response.SpikeDetail{}
+
+		err = rows.Scan(&sid, &cid, &s.Quantity, &s.Withholding, &s.PurchaseLimit, &s.AccessRule, &s.StartTime, &s.EndTime)
+		if err != nil {
+			return nil, err
+		}
+		s.ID = strconv.Itoa(sid)
+		s.CommodityID = strconv.Itoa(cid)
+
+		// 获取商品信息
+		stmt2, err := db.Prepare("select name, price from commodity where id=?")
+		if err != nil {
+			return nil, err
+		}
+		defer stmt2.Close()
+		row := stmt2.QueryRow(cid)
+		err = row.Scan(&s.CommodityName, &s.CommodityPrice)
+		if err != nil {
+			return nil, err
+		}
 
 		res = append(res, s)
 	}

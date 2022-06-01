@@ -2,20 +2,29 @@ package main
 
 import (
 	"bank_spike_backend/internal/db"
+	"bank_spike_backend/internal/pb/access"
+	redisx "bank_spike_backend/internal/redis"
 	"bank_spike_backend/internal/util"
 	"bank_spike_backend/internal/util/config"
 	jwtx "bank_spike_backend/internal/util/jwt"
+	"context"
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"log"
+	"time"
 )
 
 var (
-	port int
+	accessEndpoint string
+	port           int
+	client         access.AccessClient
 )
 
 func init() {
+	flag.StringVar(&accessEndpoint, "access-endpoint", "127.0.0.1:8082", "")
 	flag.IntVar(&port, "port", 8080, "")
 	flag.Parse()
 	config.InitViper()
@@ -23,6 +32,13 @@ func init() {
 
 func main() {
 	defer db.Close()
+
+	conn, err := grpc.Dial(accessEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	client = access.NewAccessClient(conn)
 
 	r := gin.New()
 	r.Use(gin.Logger())
@@ -51,13 +67,14 @@ func main() {
 	spike.Use(authMiddleware.MiddlewareFunc())
 	spike.GET("/", getSpikeList)
 	spike.GET("/:id", getSpikeById)
+	spike.GET("/access/:id", accessHandler)
 
 	util.WatchSignalGrace(r, port)
 }
 
 func getSpikeById(context *gin.Context) {
 	spikeId := context.Param("id")
-	spike, err := db.GetSpikeById(spikeId)
+	spike, err := db.GetSpikeByIdUser(spikeId)
 	if err != nil {
 		log.Println(err)
 		context.JSON(500, gin.H{
@@ -65,12 +82,14 @@ func getSpikeById(context *gin.Context) {
 		})
 		return
 	}
+
+	spike.Status = getSpikeStatus(context, spike.StartTime, spike.EndTime, spike.ID)
 
 	context.JSON(200, spike)
 }
 
 func getSpikeList(context *gin.Context) {
-	list, err := db.GetSpikeList()
+	list, err := db.GetSpikeListUser()
 	if err != nil {
 		log.Println(err)
 		context.JSON(500, gin.H{
@@ -79,9 +98,30 @@ func getSpikeList(context *gin.Context) {
 		return
 	}
 
+	for i, _ := range list {
+		list[i].Status = getSpikeStatus(context, list[i].StartTime, list[i].EndTime, list[i].ID)
+	}
+
 	context.JSON(200, gin.H{
 		"list": list,
 	})
+}
+
+func getSpikeStatus(ctx context.Context, startTime, endTime time.Time, spikeId string) string {
+	if startTime.After(time.Now()) {
+		return "未开始"
+	}
+	if endTime.Before(time.Now()) {
+		return "已结束"
+	}
+	numStr, err := redisx.Get(ctx, redisx.SpikeStoreKey+spikeId)
+	if err != nil {
+		return "进行中"
+	}
+	if numStr == "0" {
+		return "已售罄"
+	}
+	return "进行中"
 }
 
 func registerHandler(c *gin.Context) {
@@ -122,4 +162,28 @@ func registerHandler(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"token": jwtx.GenerateToken(id),
 	})
+}
+
+func accessHandler(c *gin.Context) {
+	spikeId := c.Param("id")
+	t, _ := c.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
+	accessible, err := client.IsAccessible(c, &access.AccessReq{
+		UserId:  user.ID,
+		SpikeId: spikeId,
+	})
+	if err != nil {
+		c.JSON(500, gin.H{
+			"error": "access server err",
+		})
+		log.Println(err)
+		return
+	}
+
+	if !accessible.Result {
+		c.JSON(403, gin.H{"error": "no access: " + accessible.Reason})
+		return
+	}
+
+	c.JSON(200, gin.H{"status": "success"})
 }
