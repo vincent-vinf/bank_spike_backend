@@ -53,6 +53,7 @@ microservices:
       - /user-service
       - --port=8080
       - --config-path=/configs/config.yaml
+      - --access-endpoint=spike-access-service.default.svc:8081
     service:
       - 8080
 

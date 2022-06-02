@@ -60,17 +60,56 @@ func main() {
 
 func payHandler(c *gin.Context) {
 	orderId := c.Param("id")
-	err := db.SetOrderState(orderId, orm.OrderPaid)
-	if err != nil {
+	// ordered -> paid
+	res, err := db.SetOrderState(orderId, orm.OrderPaid, orm.OrderOrdered)
+	if err != nil || !res {
+		log.Println(err)
 		c.JSON(500, gin.H{"error": "pay order fail"})
+		return
 	}
-	// TODO 加锁减库存
-	//https://zhaoyixing.github.io/2018/01/10/mysql-update-safe-md/
+	// 减库存
+	success, err := db.DecreaseStock(orderId)
+	if err != nil || !success {
+		log.Println(err)
+		c.JSON(500, gin.H{"error": "pay order fail"})
+		return
+	}
 	c.JSON(200, gin.H{"status": "success", "msg": "payment successful"})
 }
 
 func cancelHandler(c *gin.Context) {
+	t, _ := c.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
 
+	orderId := c.Param("id")
+	// ordered -> cancelled
+	res, err := db.SetOrderState(orderId, orm.OrderCancelled, orm.OrderOrdered)
+	if err != nil || !res {
+		log.Println(err)
+		c.JSON(500, gin.H{"error": "cancel order fail"})
+		return
+	}
+	// 加库存
+	success, err := db.IncreaseStock(orderId)
+	if err != nil || !success {
+		log.Println(err)
+		c.JSON(500, gin.H{"error": "cancel order fail"})
+		return
+	}
+	o, err := db.GetOrder(user.ID, orderId)
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, gin.H{"error": "cancel order fail"})
+		return
+	}
+	_, err = redisx.DecStore(context.Background(), redisx.SpikeStoreKey+o.SpikeID, -1)
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, gin.H{"error": "cancel order fail"})
+		return
+	}
+
+	c.JSON(200, gin.H{"status": "success", "msg": "cancel order successful"})
 }
 
 func getOrderByIdHandler(c *gin.Context) {
@@ -116,7 +155,7 @@ func dealMqOrder(ch <-chan *order.OrderInfo) {
 				} else {
 					log.Println("order already exists")
 				}
-				// 减库存
+				// 加库存
 				lua, err := redisx.DecStore(context.Background(), redisx.SpikeStoreKey+info.SpikeId, -1)
 				if err != nil {
 					log.Println(err)
