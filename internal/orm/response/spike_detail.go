@@ -12,6 +12,7 @@ type SpikeDetail struct {
 	PurchaseLimit  int
 	AccessRule     string
 	Status         string
+	OrderStatus    bool
 	StartTime      time.Time
 	EndTime        time.Time
 }

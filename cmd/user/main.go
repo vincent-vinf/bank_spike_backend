@@ -68,12 +68,16 @@ func main() {
 	spike.GET("/all", getSpikeList)
 	spike.GET("/:id", getSpikeById)
 	spike.GET("/access/:id", accessHandler)
+	spike.GET("/order/:id", orderExistHandler)
 
 	util.WatchSignalGrace(r, port)
 }
 
 func getSpikeById(context *gin.Context) {
 	spikeId := context.Param("id")
+	t, _ := context.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
+
 	spike, err := db.GetSpikeByIdUser(spikeId)
 	if err != nil {
 		log.Println(err)
@@ -84,7 +88,12 @@ func getSpikeById(context *gin.Context) {
 	}
 
 	spike.Status = getSpikeStatus(context, spike.StartTime, spike.EndTime, spike.ID)
-
+	isExist, err := db.IsExistOrder(user.ID, spikeId)
+	if err == nil && isExist {
+		spike.OrderStatus = true
+	} else {
+		log.Println(err)
+	}
 	context.JSON(200, spike)
 }
 
@@ -186,4 +195,19 @@ func accessHandler(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"status": "success"})
+}
+
+func orderExistHandler(c *gin.Context) {
+	spikeId := c.Param("id")
+	t, _ := c.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
+
+	isExist, err := db.IsExistOrder(user.ID, spikeId)
+	if err == nil && isExist {
+		c.JSON(200, gin.H{"status": "success"})
+		return
+	} else {
+		log.Println(err)
+	}
+	c.JSON(404, gin.H{"error": "order not found"})
 }
