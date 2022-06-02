@@ -50,9 +50,9 @@ func main() {
 
 	spike := router.Group("/spike")
 	spike.Use(authMiddleware.MiddlewareFunc())
-	spike.GET("/", getSpikeList)
+	spike.GET("/all", getSpikeList)
 	spike.GET("/:id", getSpikeById)
-	spike.POST("/", addSpike)
+	spike.POST("/add", addSpike)
 	spike.DELETE("/:id", deleteSpike)
 	spike.PUT("/:id", updateSpike)
 
