@@ -46,7 +46,7 @@ func main() {
 	router := r.Group("/order")
 	router.Use(authMiddleware.MiddlewareFunc())
 
-	router.GET("", listOrderHandler)
+	router.GET("/all", listOrderHandler)
 	router.GET("/:id", getOrderByIdHandler)
 	router.POST("/pay/:id", payHandler)
 	router.POST("/cancel/:id", cancelHandler)

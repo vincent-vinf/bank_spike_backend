@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
+	"strconv"
 	"time"
 )
 
@@ -65,15 +66,19 @@ func main() {
 
 	spike := router.Group("/spike")
 	spike.Use(authMiddleware.MiddlewareFunc())
-	spike.GET("/", getSpikeList)
+	spike.GET("/all", getSpikeList)
 	spike.GET("/:id", getSpikeById)
 	spike.GET("/access/:id", accessHandler)
+	spike.GET("/order/:id", orderExistHandler)
 
 	util.WatchSignalGrace(r, port)
 }
 
 func getSpikeById(context *gin.Context) {
 	spikeId := context.Param("id")
+	t, _ := context.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
+
 	spike, err := db.GetSpikeByIdUser(spikeId)
 	if err != nil {
 		log.Println(err)
@@ -84,7 +89,18 @@ func getSpikeById(context *gin.Context) {
 	}
 
 	spike.Status = getSpikeStatus(context, spike.StartTime, spike.EndTime, spike.ID)
-
+	numStr, err := redisx.Get(context, redisx.SpikeStoreKey+spike.ID)
+	log.Println(numStr)
+	if err != nil {
+		log.Println(err)
+	}
+	spike.Quantity, _ = strconv.Atoi(numStr)
+	isExist, err := db.IsExistOrder(user.ID, spikeId)
+	if err == nil && isExist {
+		spike.OrderStatus = true
+	} else {
+		log.Println(err)
+	}
 	context.JSON(200, spike)
 }
 
@@ -100,6 +116,12 @@ func getSpikeList(context *gin.Context) {
 
 	for i, _ := range list {
 		list[i].Status = getSpikeStatus(context, list[i].StartTime, list[i].EndTime, list[i].ID)
+		numStr, err := redisx.Get(context, redisx.SpikeStoreKey+list[i].ID)
+		log.Println(numStr)
+		if err != nil {
+			log.Println(err)
+		}
+		list[i].Quantity, _ = strconv.Atoi(numStr)
 	}
 
 	context.JSON(200, gin.H{
@@ -186,4 +208,19 @@ func accessHandler(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"status": "success"})
+}
+
+func orderExistHandler(c *gin.Context) {
+	spikeId := c.Param("id")
+	t, _ := c.Get(jwtx.IdentityKey)
+	user := t.(*jwtx.TokenUserInfo)
+
+	isExist, err := db.IsExistOrder(user.ID, spikeId)
+	if err == nil && isExist {
+		c.JSON(200, gin.H{"status": "success"})
+		return
+	} else {
+		log.Println(err)
+	}
+	c.JSON(404, gin.H{"error": "order not found"})
 }
