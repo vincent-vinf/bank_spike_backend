@@ -52,8 +52,6 @@ make tar_chart
 > * 支持ingress
 > * helm v3
 
-
-
 ```bash
 helm install spike-backend spike-chart-latest.tar.gz
 ```
@@ -91,7 +89,34 @@ replicaset.apps/spike-order-service-7cc84c5bf     1         1         1       15
 replicaset.apps/spike-admin-service-5db98f8b87    1         1         1       15m
 ```
 
+#### 中间件部署
 
+##### mysql
+
+```bash
+docker run -d --restart=always --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=<passwd> mysql
+```
+
+##### redis
+
+写入/root/redis.conf
+
+```
+bind 0.0.0.0
+daemonize NO
+protected-mode no
+requirepass <passwd>
+```
+
+```bash
+docker run -d --restart=always --name redis -p 6379:6379 -v /root/redis.conf:/etc/redis/redis.conf -d redis /etc/redis/redis.conf
+```
+
+##### rabbitmq
+
+```bash
+docker run -d --restart=always --name rabbitmq -p 15672:15672 -p 5672:5672 -e RABBITMQ_DEFAULT_USER=<username> -e RABBITMQ_DEFAULT_PASS=<passwd> rabbitmq:management
+```
 
 
 

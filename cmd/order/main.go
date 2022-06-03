@@ -154,7 +154,7 @@ func dealMqOrder(ch <-chan *order.OrderInfo) {
 				State:      orm.OrderOrdered,
 				CreateTime: time.Now(),
 			}
-			res, err := db.InsertOrderAffair(info.UserId, info.SpikeId, o)
+			res, err := db.InsertOrderAffair(o)
 			if err != nil || !res {
 				if err != nil {
 					log.Println(err)
@@ -169,6 +169,7 @@ func dealMqOrder(ch <-chan *order.OrderInfo) {
 				log.Println(lua)
 				continue
 			}
+			log.Println("success create id: " + o.ID)
 		}
 	}()
 }

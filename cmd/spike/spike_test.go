@@ -3,8 +3,9 @@ package main
 import (
 	"log"
 	"testing"
+	"time"
 )
 
 func TestGetRandUrl(t *testing.T) {
-	log.Println(getRandUrl("3"))
+	log.Println(time.Now())
 }

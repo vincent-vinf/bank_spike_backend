@@ -229,46 +229,27 @@ func GetOrderList(uid string) ([]*orm.Order, error) {
 	return res, nil
 }
 
-func InsertOrderAffair(userId, spikeId string, order *orm.Order) (bool, error) {
-	tx, err := db.Begin()
-	if err != nil {
-		return false, err
-	}
-	isExist, err := IsExistOrder(userId, spikeId)
-	if err != nil {
-		return false, err
-	}
-	if !isExist {
-		return false, nil
-	}
-	lines, err := InsertOrder(order)
-	if err != nil {
-		return false, err
-	}
-	if lines == 0 {
-		return false, nil
-	}
-	_ = tx.Commit()
-	return true, nil
-}
-
-func InsertOrder(order *orm.Order) (int64, error) {
+func InsertOrderAffair(order *orm.Order) (bool, error) {
 	db := getInstance()
-	stmt, err := db.Prepare("insert into orders(user_id,spike_id,quantity,state,create_time) values (?,?,?,?,?)")
+	stmt, err := db.Prepare("insert into orders(user_id,spike_id,quantity,state,create_time) SELECT ?,?,?,?,? from DUAL where not exists (select 1 from orders where user_id = ? and spike_id = ?)")
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 	defer stmt.Close()
-	res, err := stmt.Exec(order.UserID, order.SpikeID, order.Quantity, order.State, order.CreateTime)
+	res, err := stmt.Exec(order.UserID, order.SpikeID, order.Quantity, order.State, order.CreateTime, order.UserID, order.SpikeID)
 	if err != nil {
-		return 0, err
+		return false, err
+	}
+	lines, err := res.RowsAffected()
+	if lines != 1 {
+		return false, nil
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 	order.ID = strconv.Itoa(int(id))
-	return res.RowsAffected(), nil
+	return true, nil
 }
 
 func IsExistOrder(userId, spikeId string) (bool, error) {

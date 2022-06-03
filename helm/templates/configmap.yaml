@@ -5,7 +5,7 @@ metadata:
 data:
   config.yaml: |
     mysql:
-      host: 47.97.9.122
+      host: 192.168.2.2
       port: 3306
       user: root
       passwd: vincentDockerMysql2021
@@ -24,14 +24,14 @@ data:
 
     redis:
       db: 2
-      endpoint: 47.97.9.122:6379
+      endpoint: 192.168.2.2:6379
       passwd: 123abc456d@csl
 
     spike:
       rand_url_key: rand_url_key123
 
     rabbitmq:
-      host: 47.97.9.122
+      host: 192.168.2.2
       port: 5672
       user: vincent
       passwd: vincentDockerRabbit2021

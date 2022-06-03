@@ -25,7 +25,7 @@ spike:
   rand_url_key: rand_url_key123
 
 rabbitmq:
-  host: 47.97.9.122
+  host: 192.168.2.2
   port: 5672
   user: vincent
   passwd: vincentDockerRabbit2021
