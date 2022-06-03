@@ -229,23 +229,46 @@ func GetOrderList(uid string) ([]*orm.Order, error) {
 	return res, nil
 }
 
-func InsertOrder(order *orm.Order) error {
+func InsertOrderAffair(userId, spikeId string, order *orm.Order) (bool, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return false, err
+	}
+	isExist, err := IsExistOrder(userId, spikeId)
+	if err != nil {
+		return false, err
+	}
+	if !isExist {
+		return false, nil
+	}
+	lines, err := InsertOrder(order)
+	if err != nil {
+		return false, err
+	}
+	if lines == 0 {
+		return false, nil
+	}
+	_ = tx.Commit()
+	return true, nil
+}
+
+func InsertOrder(order *orm.Order) (int64, error) {
 	db := getInstance()
 	stmt, err := db.Prepare("insert into orders(user_id,spike_id,quantity,state,create_time) values (?,?,?,?,?)")
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer stmt.Close()
 	res, err := stmt.Exec(order.UserID, order.SpikeID, order.Quantity, order.State, order.CreateTime)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	order.ID = strconv.Itoa(int(id))
-	return nil
+	return res.RowsAffected(), nil
 }
 
 func IsExistOrder(userId, spikeId string) (bool, error) {

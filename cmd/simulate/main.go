@@ -108,7 +108,8 @@ func main() {
 	// 结果打印（用户 id，秒杀结果，时间）、超卖检验
 	wg.Wait() // 等待所有用户秒杀结束
 	log.Println("spike end")
-	fmt.Println(sRes)
+	log.Println("success:", sRes.success.cnt)
+	log.Println("fail:", sRes.fail.cnt)
 }
 
 func SimulateRegister(i int) {
@@ -170,7 +171,8 @@ func SimulateSpike() {
 	log.Println("spike begin")
 	for _, info := range tokenInfos {
 		// 模拟用户同一时间点击 UserPerNum 次
-		for i := 0; i < UserPerNum; i++ {
+		cnt := rand.Intn(UserPerNum) + 1
+		for i := 0; i < cnt; i++ {
 			wg.Add(1)
 			go func(info *tokenInfo) {
 				// 模拟获取随机秒杀链接

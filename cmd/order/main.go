@@ -146,10 +146,16 @@ func listOrderHandler(c *gin.Context) {
 func dealMqOrder(ch <-chan *order.OrderInfo) {
 	go func() {
 		for info := range ch {
-			log.Println(info)
 			// 判断订单是否存在
-			isExist, err := db.IsExistOrder(info.UserId, info.SpikeId)
-			if err != nil || isExist {
+			o := &orm.Order{
+				UserID:     info.UserId,
+				SpikeID:    info.SpikeId,
+				Quantity:   int(info.Quantity),
+				State:      orm.OrderOrdered,
+				CreateTime: time.Now(),
+			}
+			res, err := db.InsertOrderAffair(info.UserId, info.SpikeId, o)
+			if err != nil || !res {
 				if err != nil {
 					log.Println(err)
 				} else {
@@ -162,17 +168,6 @@ func dealMqOrder(ch <-chan *order.OrderInfo) {
 				}
 				log.Println(lua)
 				continue
-			}
-			o := &orm.Order{
-				UserID:     info.UserId,
-				SpikeID:    info.SpikeId,
-				Quantity:   int(info.Quantity),
-				State:      orm.OrderOrdered,
-				CreateTime: time.Now(),
-			}
-			err = db.InsertOrder(o)
-			if err != nil {
-				log.Println(err)
 			}
 		}
 	}()
