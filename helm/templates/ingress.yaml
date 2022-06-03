@@ -38,3 +38,11 @@ spec:
                 name: spike-admin-service
                 port:
                   number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: spike-nginx
+                port:
+                  number: 80
+

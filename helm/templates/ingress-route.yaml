@@ -1,0 +1,53 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-spike-path
+  namespace: default
+spec:
+  stripPrefix:
+    prefixes:
+      - /prod-api/spike
+
+---
+
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: spike-path-rewrite
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`spike.vinf.top`) && PathPrefix(`/prod-api/spike/users`)
+      middlewares:
+        - name: strip-spike-path
+      services:
+        - kind: Service
+          name: spike-user-service
+          port: 8080
+    - kind: Rule
+      match: Host(`spike.vinf.top`) && PathPrefix(`/prod-api/spike/spike`)
+      middlewares:
+        - name: strip-spike-path
+      services:
+        - kind: Service
+          name: spike-spike-service
+          port: 8080
+    - kind: Rule
+      match: Host(`spike.vinf.top`) && PathPrefix(`/prod-api/spike/order`)
+      middlewares:
+        - name: strip-spike-path
+      services:
+        - kind: Service
+          name: spike-order-service
+          port: 8080
+    - kind: Rule
+      match: Host(`spike.vinf.top`) && PathPrefix(`/prod-api/spike/admin`)
+      middlewares:
+        - name: strip-spike-path
+      services:
+        - kind: Service
+          name: spike-admin-service
+          port: 8080
