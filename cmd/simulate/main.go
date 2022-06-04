@@ -236,17 +236,20 @@ func SimulateSpike() {
 				}()
 				// 模拟获取随机秒杀链接
 
+				//t := time.Now()
 				// 保证一个用户只需 get 一次 token
-				muxSpikeToken.Lock()
-				if tokenInfos[i].spikeToken == "" {
-					t1 := time.Now()
-					res, err = SimulateGet(UrlMap["spike"]+SpikeId, map[string]string{"Authorization": "Bearer " + info.token})
-					if err == nil && res != nil {
-						tokenInfos[i].spikeToken = res["token"].(string)
-					}
-					reqTimes[i*UserPerNum+j] += time.Now().Sub(t1).Milliseconds()
+				//muxSpikeToken.Lock()
+				//if tokenInfos[i].spikeToken == "" {
+				t1 := time.Now()
+				res, err = SimulateGet(UrlMap["spike"]+SpikeId, map[string]string{"Authorization": "Bearer " + info.token})
+				if err == nil && res != nil {
+					tokenInfos[i].spikeToken = res["token"].(string)
 				}
-				muxSpikeToken.Unlock()
+				log.Println(time.Now().Sub(t1).Milliseconds())
+				//reqTimes[i*UserPerNum+j] += time.Now().Sub(t1).Milliseconds()
+				//}
+				//muxSpikeToken.Unlock()
+				//log.Println(time.Now().Sub(t).Milliseconds())
 
 				// get token 错误时无需 spike 请求
 				if err != nil {
@@ -254,13 +257,14 @@ func SimulateSpike() {
 				}
 				if _, ok := res["error"]; !ok {
 					// 模拟秒杀
-					t1 := time.Now()
+					//t1 := time.Now()
 					res, err = SimulatePost(
 						UrlMap["spike"]+SpikeId+"/"+tokenInfos[i].spikeToken,
 						nil,
 						map[string]string{"Authorization": "Bearer " + info.token},
 					)
-					reqTimes[i*UserPerNum+j] += time.Now().Sub(t1).Milliseconds() // 记录 spike 请求时间，用于统计
+					log.Println(time.Now().Sub(t1).Milliseconds())
+					reqTimes[i*UserPerNum+j] = time.Now().Sub(t1).Milliseconds() // 记录 spike 请求时间，用于统计
 				}
 
 			}(info, i, j)
