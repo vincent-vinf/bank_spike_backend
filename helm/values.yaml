@@ -26,7 +26,7 @@ microservices:
       - 8080
 
   - name: order-service
-    replicaCount: 1
+    replicaCount: 2
     image: registry.cn-qingdao.aliyuncs.com/adpc/spike-order-service:latest
     command:
       - /order-service
@@ -36,7 +36,7 @@ microservices:
       - 8080
 
   - name: spike-service
-    replicaCount: 1
+    replicaCount: 2
     image: registry.cn-qingdao.aliyuncs.com/adpc/spike-spike-service:latest
     command:
       - /spike-service

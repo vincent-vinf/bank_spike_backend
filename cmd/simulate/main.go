@@ -21,8 +21,8 @@ const (
 	UserPrefix  = "s-user-"
 	PhonePrefix = "+86-"
 	IdNumber    = "s-no-"
-	UserNum     = 1000 // 用户数量
-	UserPerNum  = 5    // 每个用户请求最大数量
+	UserNum     = 500 // 用户数量
+	UserPerNum  = 20  // 每个用户请求最大数量
 	SpikeId     = "6"
 	BaseUrl     = "http://spike.vinf.top"
 )
@@ -203,37 +203,11 @@ func SimulateSpike() {
 	for i, info := range tokenInfos {
 		// 模拟用户同一时间点击 UserPerNum 次
 		//cnt := rand.Intn(UserPerNum) + 1
-		for j := 0; j < UserPerNum; j++ {
-			wg.Add(1)
-			go func(info *tokenInfo, i, j int) { // goroutine 传参
-				var res map[string]interface{}
-				var err error
-				defer func() {
-					// 保存结果
-					if err != nil {
-						sRes[i*UserPerNum+j] = spikeUserResult{
-							status:   3,
-							username: info.username,
-							res:      map[string]interface{}{"error": err.Error()},
-						}
-					} else {
-						if res["status"] != nil && res["status"].(string) == "success" {
-							sRes[i*UserPerNum+j] = spikeUserResult{
-								status:   1,
-								username: info.username,
-								res:      res,
-							}
-						} else {
-							sRes[i*UserPerNum+j] = spikeUserResult{
-								status:   2,
-								username: info.username,
-								res:      res,
-							}
-						}
-					}
-					bar.Add(1)
-					wg.Done()
-				}()
+		wg.Add(1)
+		go func(info *tokenInfo, i int) { // goroutine 传参
+			for j := 0; j < UserPerNum; j++ {
+				//var res map[string]interface{}
+				//var err error
 				// 模拟获取随机秒杀链接
 
 				//t := time.Now()
@@ -241,34 +215,55 @@ func SimulateSpike() {
 				//muxSpikeToken.Lock()
 				//if tokenInfos[i].spikeToken == "" {
 				t1 := time.Now()
-				res, err = SimulateGet(UrlMap["spike"]+SpikeId, map[string]string{"Authorization": "Bearer " + info.token})
+				res, err := SimulateGet(UrlMap["spike"]+SpikeId, map[string]string{"Authorization": "Bearer " + info.token})
 				if err == nil && res != nil {
 					tokenInfos[i].spikeToken = res["token"].(string)
 				}
-				log.Println(time.Now().Sub(t1).Milliseconds())
 				//reqTimes[i*UserPerNum+j] += time.Now().Sub(t1).Milliseconds()
 				//}
 				//muxSpikeToken.Unlock()
 				//log.Println(time.Now().Sub(t).Milliseconds())
 
 				// get token 错误时无需 spike 请求
+				if err == nil {
+					if _, ok := res["error"]; !ok {
+						// 模拟秒杀
+						//t1 := time.Now()
+						res, err = SimulatePost(
+							UrlMap["spike"]+SpikeId+"/"+tokenInfos[i].spikeToken,
+							nil,
+							map[string]string{"Authorization": "Bearer " + info.token},
+						)
+					}
+				}
+				reqTimes[i*UserPerNum+j] = time.Now().Sub(t1).Milliseconds() // 记录 spike 请求时间，用于统计
+				// 保存结果
 				if err != nil {
-					return
+					sRes[i*UserPerNum+j] = spikeUserResult{
+						status:   3,
+						username: info.username,
+						res:      map[string]interface{}{"error": err.Error()},
+					}
+				} else {
+					if res["status"] != nil && res["status"].(string) == "success" {
+						sRes[i*UserPerNum+j] = spikeUserResult{
+							status:   1,
+							username: info.username,
+							res:      res,
+						}
+					} else {
+						sRes[i*UserPerNum+j] = spikeUserResult{
+							status:   2,
+							username: info.username,
+							res:      res,
+						}
+					}
 				}
-				if _, ok := res["error"]; !ok {
-					// 模拟秒杀
-					//t1 := time.Now()
-					res, err = SimulatePost(
-						UrlMap["spike"]+SpikeId+"/"+tokenInfos[i].spikeToken,
-						nil,
-						map[string]string{"Authorization": "Bearer " + info.token},
-					)
-					log.Println(time.Now().Sub(t1).Milliseconds())
-					reqTimes[i*UserPerNum+j] = time.Now().Sub(t1).Milliseconds() // 记录 spike 请求时间，用于统计
-				}
+				bar.Add(1)
+			}
 
-			}(info, i, j)
-		}
+			wg.Done()
+		}(info, i)
 	}
 	wg.Done()
 }
