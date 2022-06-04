@@ -17,6 +17,7 @@ import (
 	"flag"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
+	"github.com/patrickmn/go-cache"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -32,6 +33,8 @@ var (
 	client access.AccessClient
 	loader = &singleflight.Group{}
 	sender *mq.Client
+
+	tokenCache = cache.New(10*time.Minute, 20*time.Minute)
 )
 
 func init() {
@@ -78,50 +81,57 @@ func main() {
 }
 
 func getRandHandler(c *gin.Context) {
-	/// TODO(vincent) 根据用户id限流
 	spikeId := c.Param("id")
-	randStr, err := redisx.Get(c, redisx.RandKey+spikeId)
-	if err == redis.Nil {
-		spike, err := loader.Do(spikeId, func() (interface{}, error) {
-			spike, err := db.GetSpikeById(spikeId)
-			if err != nil {
-				return nil, err
-			}
-			return spike, nil
-		})
-		if err != nil {
-			internalErr(c, err)
-			return
-		}
-		s := spike.(*orm.Spike)
-		if s == nil {
-			c.JSON(404, gin.H{"error": "activity does not exist"})
-			log.Println(err)
-			return
-		}
-		now := time.Now()
-		if now.Before(s.StartTime) || now.After(s.EndTime) {
-			c.JSON(404, gin.H{"error": "not at activity time"})
-			return
-		}
-
-		randStr = getRandUrl(s.ID)
-
-		ok, err := redisx.SetNX(c, redisx.RandKey+s.ID, randStr, s.EndTime.Sub(time.Now()))
-		if err != nil {
-			internalErr(c, err)
-			return
-		}
-		if !ok {
-			randStr, err = redisx.Get(c, redisx.RandKey+spikeId)
+	var randStr string
+	var err error
+	// 从本地获取
+	if t, ok := tokenCache.Get(spikeId); ok {
+		randStr = t.(string)
+	} else {
+		randStr, err = redisx.Get(c, redisx.RandKey+spikeId)
+		if err == redis.Nil {
+			spike, err := loader.Do(spikeId, func() (interface{}, error) {
+				spike, err := db.GetSpikeById(spikeId)
+				if err != nil {
+					return nil, err
+				}
+				return spike, nil
+			})
 			if err != nil {
 				internalErr(c, err)
 				return
 			}
+			s := spike.(*orm.Spike)
+			if s == nil {
+				c.JSON(404, gin.H{"error": "activity does not exist"})
+				log.Println(err)
+				return
+			}
+			now := time.Now()
+			if now.Before(s.StartTime) || now.After(s.EndTime) {
+				c.JSON(404, gin.H{"error": "not at activity time"})
+				return
+			}
+
+			randStr = getRandUrl(s.ID)
+
+			ok, err := redisx.SetNX(c, redisx.RandKey+s.ID, randStr, s.EndTime.Sub(time.Now()))
+			if err != nil {
+				internalErr(c, err)
+				return
+			}
+			if !ok {
+				randStr, err = redisx.Get(c, redisx.RandKey+spikeId)
+				if err != nil {
+					internalErr(c, err)
+					return
+				}
+			}
+		} else if err != nil {
+			internalErr(c, err)
+			return
 		}
-	} else if err != nil {
-		internalErr(c, err)
-		return
+		tokenCache.Set(spikeId, randStr, time.Minute*20)
 	}
 
 	c.JSON(200, gin.H{"token": randStr})
@@ -175,11 +185,15 @@ func spikeHandler(c *gin.Context) {
 		return
 	}
 
-	sender.Publish(&order.OrderInfo{
+	err = sender.Publish(&order.OrderInfo{
 		UserId:   user.ID,
 		SpikeId:  spikeId,
 		Quantity: 1,
 	})
+	if err != nil {
+		internalErr(c, err)
+		return
+	}
 
 	c.JSON(200, gin.H{"status": "success", "msg": "rest: " + strconv.Itoa(restStore)})
 }
