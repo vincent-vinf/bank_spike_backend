@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/robfig/cron/v3"
+	"github.com/schollz/progressbar/v3"
 	"io/ioutil"
 	"log"
 	"math"
@@ -23,13 +24,13 @@ const (
 	UserNum     = 1000 // 用户数量
 	UserPerNum  = 5    // 每个用户请求最大数量
 	SpikeId     = "6"
-	BaseUrl     = "http://127.0.0.1:"
+	BaseUrl     = "http://spike.vinf.top"
 )
 
 var (
 	UrlMap = map[string]string{
-		"user":  BaseUrl + "8080/users/",
-		"spike": BaseUrl + "8081/spike/",
+		"user":  BaseUrl + "/users/",
+		"spike": BaseUrl + "/spike/",
 	}
 	WorkStatus = []string{"公务员", "无业", "老师"}
 )
@@ -41,30 +42,21 @@ type tokenInfo struct {
 }
 
 type spikeUserResult struct {
+	status   int
 	username string
 	res      map[string]interface{}
 }
 
-type spikeSimulateResult struct {
-	success struct {
-		cnt  int
-		list []spikeUserResult
-	}
-	fail struct {
-		cnt1 int // 秒杀失败
-		cnt2 int // 请求错误
-		list []spikeUserResult
-	}
-}
-
 var wg sync.WaitGroup
-var mux, muxSpikeToken sync.Mutex
+var muxSpikeToken sync.Mutex
 var startTime time.Time
 var reqTimes [UserNum * UserPerNum]int64 // 数组直接下标赋值无需锁
 var tokenInfos [UserNum]*tokenInfo
-var sRes spikeSimulateResult
+var sRes [UserNum * UserPerNum]spikeUserResult
+var bar *progressbar.ProgressBar
 
 func main() {
+	bar = progressbar.Default(UserNum, "login")
 	startTime = time.Now()
 	log.Println("simulate begin")
 	// 模拟注册
@@ -76,13 +68,15 @@ func main() {
 			//SimulateRegister(i)
 			// 模拟登录
 			SimulateLogin(i)
+			SimulateGet(UrlMap["user"]+"spike/access/"+SpikeId, map[string]string{"Authorization": "Bearer " + tokenInfos[i].token})
+			bar.Add(1)
 			wg.Done()
 		}(i)
 		if (i+1)%UserNum == 0 {
 			wg.Wait()
 		}
 	}
-	log.Println(len(tokenInfos), "register/login successfully, ran:", time.Now().Sub(startTime))
+	log.Println("\n", len(tokenInfos), "register/login successfully, ran:", time.Now().Sub(startTime))
 
 	// 获取 spike 开始时间、定时任务
 	spike, err := SimulateGet(UrlMap["user"]+"spike/"+SpikeId, map[string]string{"Authorization": "Bearer " + tokenInfos[0].token})
@@ -115,7 +109,7 @@ func main() {
 
 	// 结果打印（用户 id，秒杀结果，时间）、超卖检验
 	wg.Wait() // 等待所有用户秒杀结束
-	log.Println("spike end, ran:", time.Now().Sub(startTime))
+	log.Println("\nspike end, ran:", time.Now().Sub(startTime))
 	var max, min, aver int64
 	min = math.MaxInt64
 	for _, reqTime := range reqTimes {
@@ -130,10 +124,21 @@ func main() {
 	log.Println("req min:", min, "ms")
 	log.Println("req max:", max, "ms")
 	log.Println("req average:", aver, "ms")
-	log.Println("total:", sRes.success.cnt+sRes.fail.cnt1+sRes.fail.cnt2)
-	log.Println("success to spike:", sRes.success.cnt)
-	log.Println("fail to spike:", sRes.fail.cnt1)
-	log.Println("fail to request:", sRes.fail.cnt2)
+	log.Println("total:", len(sRes))
+	var cnt1, cnt2, cnt3 int
+	for _, r := range sRes {
+		switch r.status {
+		case 1:
+			cnt1++
+		case 2:
+			cnt2++
+		case 3:
+			cnt3++
+		}
+	}
+	log.Println("success to spike:", cnt1)
+	log.Println("fail to spike:", cnt2)
+	log.Println("fail to request:", cnt3)
 	log.Println("simulate end")
 	//log.Println("sRes", sRes)
 }
@@ -192,66 +197,72 @@ func SimulateLogin(i int) {
 func SimulateSpike() {
 	startTime = time.Now()
 	log.Println("spike begin")
+	bar.ChangeMax(UserNum * UserPerNum)
+	bar.Describe("spike")
+	bar.Reset()
 	for i, info := range tokenInfos {
 		// 模拟用户同一时间点击 UserPerNum 次
 		//cnt := rand.Intn(UserPerNum) + 1
 		for j := 0; j < UserPerNum; j++ {
 			wg.Add(1)
 			go func(info *tokenInfo, i, j int) { // goroutine 传参
+				var res map[string]interface{}
+				var err error
+				defer func() {
+					// 保存结果
+					if err != nil {
+						sRes[i*UserPerNum+j] = spikeUserResult{
+							status:   3,
+							username: info.username,
+							res:      map[string]interface{}{"error": err.Error()},
+						}
+					} else {
+						if res["status"] != nil && res["status"].(string) == "success" {
+							sRes[i*UserPerNum+j] = spikeUserResult{
+								status:   1,
+								username: info.username,
+								res:      res,
+							}
+						} else {
+							sRes[i*UserPerNum+j] = spikeUserResult{
+								status:   2,
+								username: info.username,
+								res:      res,
+							}
+						}
+					}
+					bar.Add(1)
+					wg.Done()
+				}()
 				// 模拟获取随机秒杀链接
-				t1 := time.Now()
 
 				// 保证一个用户只需 get 一次 token
 				muxSpikeToken.Lock()
-				var res map[string]interface{}
-				var err error
 				if tokenInfos[i].spikeToken == "" {
+					t1 := time.Now()
 					res, err = SimulateGet(UrlMap["spike"]+SpikeId, map[string]string{"Authorization": "Bearer " + info.token})
 					if err == nil && res != nil {
 						tokenInfos[i].spikeToken = res["token"].(string)
 					}
+					reqTimes[i*UserPerNum+j] += time.Now().Sub(t1).Milliseconds()
 				}
 				muxSpikeToken.Unlock()
 
 				// get token 错误时无需 spike 请求
-				if err == nil {
-					// 是否正常获取到 token
-					if _, ok := res["error"]; !ok {
-						// 模拟秒杀
-						res, err = SimulatePost(
-							UrlMap["spike"]+SpikeId+"/"+tokenInfos[i].spikeToken,
-							nil,
-							map[string]string{"Authorization": "Bearer " + info.token},
-						)
-					}
-				}
-				reqTimes[i*UserPerNum+j] = time.Now().Sub(t1).Milliseconds() // 记录 spike 请求时间，用于统计
-
-				mux.Lock()
-				// 保存结果
 				if err != nil {
-					sRes.fail.cnt2++
-					sRes.fail.list = append(sRes.fail.list, spikeUserResult{
-						username: info.username,
-						res:      map[string]interface{}{"error": err.Error()},
-					})
-				} else {
-					if res["status"] != nil && res["status"].(string) == "success" {
-						sRes.success.cnt++
-						sRes.success.list = append(sRes.success.list, spikeUserResult{
-							username: info.username,
-							res:      res,
-						})
-					} else {
-						sRes.fail.cnt1++
-						sRes.fail.list = append(sRes.fail.list, spikeUserResult{
-							username: info.username,
-							res:      res,
-						})
-					}
+					return
 				}
-				mux.Unlock()
-				wg.Done()
+				if _, ok := res["error"]; !ok {
+					// 模拟秒杀
+					t1 := time.Now()
+					res, err = SimulatePost(
+						UrlMap["spike"]+SpikeId+"/"+tokenInfos[i].spikeToken,
+						nil,
+						map[string]string{"Authorization": "Bearer " + info.token},
+					)
+					reqTimes[i*UserPerNum+j] += time.Now().Sub(t1).Milliseconds() // 记录 spike 请求时间，用于统计
+				}
+
 			}(info, i, j)
 		}
 	}
