@@ -109,7 +109,8 @@ func main() {
 
 	// 结果打印（用户 id，秒杀结果，时间）、超卖检验
 	wg.Wait() // 等待所有用户秒杀结束
-	log.Println("\nspike end, ran:", time.Now().Sub(startTime))
+	spikeEnd := time.Now().Sub(startTime)
+	log.Println("\nspike end, ran:", spikeEnd.Milliseconds(), "ms")
 	var max, min, aver int64
 	min = math.MaxInt64
 	for _, reqTime := range reqTimes {
@@ -125,6 +126,7 @@ func main() {
 	log.Println("req max:", max, "ms")
 	log.Println("req average:", aver, "ms")
 	log.Println("total:", len(sRes))
+	log.Println("qps:", float64(UserNum*UserPerNum)/float64(spikeEnd.Milliseconds())*1000)
 	var cnt1, cnt2, cnt3 int
 	for _, r := range sRes {
 		switch r.status {
