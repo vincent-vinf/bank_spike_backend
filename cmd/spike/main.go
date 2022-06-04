@@ -18,12 +18,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/patrickmn/go-cache"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"math/rand"
 	"strconv"
 	"time"
+)
+
+const (
+	defaultMaxRequestNum = 1500
+	defaultLimit         = 100
 )
 
 var (
@@ -34,7 +40,7 @@ var (
 	loader = &singleflight.Group{}
 	sender *mq.Client
 
-	tokenCache = cache.New(10*time.Minute, 20*time.Minute)
+	spikeUtilCache = cache.New(10*time.Minute, 20*time.Minute)
 )
 
 func init() {
@@ -42,6 +48,11 @@ func init() {
 	flag.IntVar(&port, "port", 8081, "")
 	flag.Parse()
 	config.InitViper()
+}
+
+type spikeUtil struct {
+	token   string
+	limiter *rate.Limiter
 }
 
 func main() {
@@ -56,6 +67,7 @@ func main() {
 	client = access.NewAccessClient(conn)
 
 	r := gin.New()
+	gin.SetMode(gin.ReleaseMode)
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
@@ -85,10 +97,14 @@ func getRandHandler(c *gin.Context) {
 	var randStr string
 	var err error
 	// 从本地获取
-	if t, ok := tokenCache.Get(spikeId); ok {
-		randStr = t.(string)
+	if t, ok := spikeUtilCache.Get(spikeId); ok {
+		randStr = t.(*spikeUtil).token
 	} else {
 		randStr, err = redisx.Get(c, redisx.RandKey+spikeId)
+		su := &spikeUtil{
+			token:   "",
+			limiter: nil,
+		}
 		if err == redis.Nil {
 			spike, err := loader.Do(spikeId, func() (interface{}, error) {
 				spike, err := db.GetSpikeById(spikeId)
@@ -127,11 +143,17 @@ func getRandHandler(c *gin.Context) {
 					return
 				}
 			}
+			if s.Withholding*2 > defaultMaxRequestNum {
+				su.limiter = rate.NewLimiter(defaultLimit, defaultMaxRequestNum)
+			} else {
+				su.limiter = rate.NewLimiter(defaultLimit, s.Withholding*2)
+			}
 		} else if err != nil {
 			internalErr(c, err)
 			return
 		}
-		tokenCache.Set(spikeId, randStr, time.Minute*20)
+		su.token = randStr
+		spikeUtilCache.Set(spikeId, su, time.Minute*20)
 	}
 
 	c.JSON(200, gin.H{"token": randStr})
@@ -141,14 +163,33 @@ func getRandHandler(c *gin.Context) {
 func spikeHandler(c *gin.Context) {
 	spikeId := c.Param("id")
 	r := c.Param("rand")
-	pass, err := redisx.CheckUrl(c, spikeId, r)
-	if err != nil {
-		internalErr(c, err)
-		return
+	var pass bool
+	var su *spikeUtil
+	if s, ok := spikeUtilCache.Get(spikeId); ok {
+		su = s.(*spikeUtil)
+		pass = r == su.token
+	} else {
+		randStr, err := redisx.Get(c, redisx.RandKey+spikeId)
+
+		if err == redis.Nil {
+			pass = false
+		} else if err != nil {
+			internalErr(c, err)
+			return
+		} else {
+			pass = r == randStr
+		}
 	}
+
 	if !pass {
 		c.JSON(404, gin.H{"message": "page not found"})
 		return
+	}
+
+	if su != nil {
+		if !su.limiter.Allow() {
+			c.JSON(503, gin.H{"status": "fail", "msg": "server is busy"})
+		}
 	}
 
 	if getRestStock(c, spikeId) <= 0 {

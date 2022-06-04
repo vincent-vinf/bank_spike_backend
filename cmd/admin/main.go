@@ -27,6 +27,7 @@ func main() {
 	defer redisx.Close()
 
 	r := gin.New()
+	gin.SetMode(gin.ReleaseMode)
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 

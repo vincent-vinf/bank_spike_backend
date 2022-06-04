@@ -157,11 +157,7 @@ docker run -d --restart=always --name rabbitmq -p 15672:15672 -p 5672:5672 -e RA
 
 ***
 
-- [ ] 针对用户id，访问接口频率限流
-
-  代码位置：插入 spike的`getRandHandler`和`spikeHandler`函数前
-
-  当用户在一秒内访问了n次(比如10，可配置)以上时，直接返回429，最好通过redis实现
+- [x] 接口限流
 
   令牌桶
 

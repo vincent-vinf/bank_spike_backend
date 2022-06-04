@@ -21,8 +21,8 @@ const (
 	UserPrefix  = "s-user-"
 	PhonePrefix = "+86-"
 	IdNumber    = "s-no-"
-	UserNum     = 80 // 用户数量
-	UserPerNum  = 5  // 每个用户请求最大数量
+	UserNum     = 500 // 用户数量
+	UserPerNum  = 20  // 每个用户请求最大数量
 	SpikeId     = "6"
 	BaseUrl     = "http://spike.vinf.top"
 )
