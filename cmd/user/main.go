@@ -9,10 +9,12 @@ import (
 	jwtx "bank_spike_backend/internal/util/jwt"
 	"context"
 	"flag"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
+	"strconv"
 	"time"
 )
 
@@ -88,6 +90,15 @@ func getSpikeById(context *gin.Context) {
 	}
 
 	spike.Status = getSpikeStatus(context, spike.StartTime, spike.EndTime, spike.ID)
+
+	if spike.StartTime.Before(time.Now()) && spike.EndTime.After(time.Now()) {
+		numStr, err := redisx.Get(context, redisx.SpikeStoreKey+spike.ID)
+		log.Println(numStr)
+		if err != nil {
+			log.Println(err)
+		}
+		spike.Withholding, _ = strconv.Atoi(numStr)
+	}
 	isExist, err := db.IsExistOrder(user.ID, spikeId)
 	if err == nil && isExist {
 		spike.OrderStatus = true
@@ -109,6 +120,14 @@ func getSpikeList(context *gin.Context) {
 
 	for i, _ := range list {
 		list[i].Status = getSpikeStatus(context, list[i].StartTime, list[i].EndTime, list[i].ID)
+		if list[i].StartTime.Before(time.Now()) && list[i].EndTime.After(time.Now()) {
+			numStr, err := redisx.Get(context, redisx.SpikeStoreKey+list[i].ID)
+			log.Println(numStr)
+			if err != nil {
+				log.Println(err)
+			}
+			list[i].Quantity, _ = strconv.Atoi(numStr)
+		}
 	}
 
 	context.JSON(200, gin.H{
@@ -165,6 +184,8 @@ func registerHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	fmt.Printf("id (%v, %T)\n", id, id)
 
 	c.JSON(200, gin.H{
 		"token": jwtx.GenerateToken(id),
