@@ -103,7 +103,7 @@ func getRandHandler(c *gin.Context) {
 		randStr, err = redisx.Get(c, redisx.RandKey+spikeId)
 		su := &spikeUtil{
 			token:   "",
-			limiter: nil,
+			limiter: rate.NewLimiter(defaultLimit, defaultMaxRequestNum),
 		}
 		if err == redis.Nil {
 			spike, err := loader.Do(spikeId, func() (interface{}, error) {
@@ -143,10 +143,8 @@ func getRandHandler(c *gin.Context) {
 					return
 				}
 			}
-			if s.Withholding*2 > defaultMaxRequestNum {
-				su.limiter = rate.NewLimiter(defaultLimit, defaultMaxRequestNum)
-			} else {
-				su.limiter = rate.NewLimiter(defaultLimit, s.Withholding*2)
+			if s.Withholding*2 < defaultMaxRequestNum {
+				su.limiter.SetBurst(s.Withholding * 2)
 			}
 		} else if err != nil {
 			internalErr(c, err)
